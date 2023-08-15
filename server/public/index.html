@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="content-width=device-width, initial-scale=1.0">
+    <title>WebRTC Connection</title>
+</head>
+<body>
+<h1>Connect Two Devices</h1>
+<button id="createSession">Create Session</button>
+<div id="sessionCode"></div>
+<button id="connect">Connect</button>
+
+<div id="chatArea" style="display: none;">
+    <div id="messages"></div>
+    <input type="text" id="messageInput">
+    <button id="sendMessage">Send</button>
+</div>
+
+
+<script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore-compat.js"></script>
+<script src="client.js"></script>
+</body>
+</html>
