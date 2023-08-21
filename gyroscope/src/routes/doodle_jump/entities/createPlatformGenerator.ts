@@ -1,10 +1,11 @@
 import {GameLevel} from "../core/level";
 import {getGameConfig} from "../core/config";
 import {isInRange, takeChance} from "../utils";
-import type {PlatformType} from "../$types";
+import type {PlatformTexturesType, PlatformType} from "../$types";
 import {Vec3} from "../core/vec3";
 import {createPlatform} from "./createPlatform";
 import {createCollectable} from "./createCollectable";
+import {TextureLoader} from "three";
 
 export function createPlatformGenerator(level: GameLevel) {
     const oscChance = getGameConfig("PLATFORM.GENERATION.OSCILLATING", true);
@@ -16,6 +17,18 @@ export function createPlatformGenerator(level: GameLevel) {
     const relMaxAlt = getGameConfig("PLATFORM.GENERATION.RELATIVE_MAX_ALTITUDE", true);
     const collectableChance = getGameConfig("COLLECTABLE.GENERATION.CHANCE", true);
 
+    const loader = new TextureLoader();
+
+    const platformTexture = loader.load ('/textures/platform.png')
+    const boostTexture = loader.load("/textures/boost.png")
+
+    const textures: PlatformTexturesType = {
+        platformTexture: platformTexture,
+        boostTexture: boostTexture
+    }
+
+    let platformNumber: number = 0;
+
     const halfMaxHSpace = maxHSpace / 2;
 
     const uuid = level.universe.createEntity();
@@ -26,6 +39,7 @@ export function createPlatformGenerator(level: GameLevel) {
 
     level.universe.registerSystem("platformGeneratorSystem", ({createView}) => {
         let playerAltitude: number | null = null;
+
         for (const {player} of createView("player")) {
             playerAltitude = player.altitude;
         }
@@ -61,7 +75,8 @@ export function createPlatformGenerator(level: GameLevel) {
 
             // generate the platform
             const platformVector = new Vec3(platformX, platformGenerator.maxAltitude, 0);
-            createPlatform(level, platformVector, platformType);
+            createPlatform(level, platformVector, platformType, textures, platformNumber);
+            platformNumber++;
 
             // generate a star by chance if platform is not oscillating
             if (takeChance(collectableChance) && !platformType.oscillating) {

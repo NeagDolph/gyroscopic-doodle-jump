@@ -1,8 +1,10 @@
 import {ConfigIniParser} from "config-ini-parser";
 
-const parser = new ConfigIniParser();
+let parser;
 
 export function loadGameConfig(content: string) {
+    parser = new ConfigIniParser();
+
     parser.parse(content);
 }
 

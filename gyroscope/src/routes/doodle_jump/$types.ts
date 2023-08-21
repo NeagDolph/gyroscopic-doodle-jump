@@ -1,5 +1,6 @@
 import {ExtendedObject3D} from "enable3d";
 import {Vec3} from "./core/vec3";
+import {Texture} from "three";
 
 export type InputReceiver = {
     keyboard: string[];
@@ -64,4 +65,10 @@ export type PlatformType = {
     oscillating: boolean
     breakable: boolean
     boost: boolean
+}
+
+export type PlatformTexturesType = {
+    boostTexture: Texture,
+    platformTexture: Texture,
+    breakingTexture?: Texture
 }

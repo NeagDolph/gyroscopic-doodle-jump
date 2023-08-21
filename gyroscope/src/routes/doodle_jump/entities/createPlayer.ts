@@ -9,6 +9,8 @@ import type {ComponentMap, SystemList} from "../$types";
 import {getGameConfig} from "../core/config";
 import {loadModel} from "../core/loader";
 import {Material, Mesh} from "three";
+import {getBetaRotation} from "../../movementStore";
+import {initDoodleJump} from "../main";
 
 export function createPlayer(level: GameLevel, at: Vec3) {
     const playerName = getGameConfig("OBJECT.NAME.PLAYER", false);
@@ -27,8 +29,11 @@ export function createPlayer(level: GameLevel, at: Vec3) {
         const mesh: Mesh = model;
         mesh.scale.set(0.45, 0.45, 0.45);
         mesh.position.set(0, -1, -0.1)
+        mesh.rotateY(-0.4);
 
-        mesh.castShadow = mesh.receiveShadow = false;
+        // const mesh = new ExtendedMesh(geometry, material);
+
+        mesh.castShadow = mesh.receiveShadow = true;
 
         const object3D = new ExtendedObject3D();
         object3D.add(mesh);
@@ -39,6 +44,7 @@ export function createPlayer(level: GameLevel, at: Vec3) {
         level.physics.add.existing(object3D, {
             shape: "convexMesh",
             mass: 90,
+            restitution: 5,
             collisionFlags: 4
         });
         level.add.existing(object3D);
@@ -52,8 +58,10 @@ export function createPlayer(level: GameLevel, at: Vec3) {
             shape: "box",
             width: .8,
             height: 0.4,
+            restitution: 5,
             depth: .8,
             collisionFlags: 4,
+            // mass: 100
             mass: 1e-8
         });
         level.physics.add.constraints.fixed(sensor.body, object3D.body, true);
@@ -124,10 +132,16 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
             }
 
             // calculating horizontal movement
-            const horizontalMovement = (
-                Number(inputReceiver.keyboard.includes("ArrowLeft")) * -1 +
-                Number(inputReceiver.keyboard.includes("ArrowRight"))
-            );
+            // const horizontalMovement = (
+            //     Number(inputReceiver.keyboard.includes("ArrowLeft")) * -1 +
+            //     Number(inputReceiver.keyboard.includes("ArrowRight"))
+            // );
+
+            const horizontalMovement = getBetaRotation() / 20;
+
+
+
+
             const xVel = lerp(
                 physicsObject.body.velocity.x, playerSpeed * horizontalMovement,
                 playerAcceleration
@@ -140,9 +154,18 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
             if (player.isOnPlatform && physicsObject.body.velocity.y <= 0) {
 
                 if (player.isOnBoostPlatform) {
+
                     physicsObject.body.setVelocityY(
                         playerJumpVelocity * platformBoostMult
                     );
+
+                    physicsObject.body.setDamping(0, 0.8455)
+
+                    physicsObject.body.setAngularVelocityZ(
+                        (playerJumpVelocity / 2) * platformBoostMult
+                    );
+
+
                 } else {
                     physicsObject.body.setVelocityY(playerJumpVelocity);
                 }
@@ -158,8 +181,14 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
 
                 // inform that the game is over
                 player.fallen = true;
-                alert("Game Over");
-                window.location.reload();
+
+                // level.uni
+                //
+                // window.document.querySelector("canvas").remove();
+                //
+                // initDoodleJump()
+                // alert("Game Over");
+                // window.location.reload();
             }
 
             // updating camera director position

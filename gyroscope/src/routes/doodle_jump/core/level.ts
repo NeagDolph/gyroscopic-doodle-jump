@@ -10,21 +10,22 @@ import {createPlatformGenerator} from "../entities/createPlatformGenerator";
 import {getGameConfig} from "./config";
 import {createShadowUpdaterSystem} from "../systems/createShadowUpdaterSystem";
 import {createPersistenceSystem} from "../systems/createPersistenceSystem";
-import {Mesh, MeshBasicMaterial, PlaneGeometry, Texture} from "three";
+import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, Texture} from "three";
 
 class GameLevel extends Scene3D {
     public universe: Universe<ComponentMap, SystemList>;
     public directionalLight: THREE.DirectionalLight | undefined;
+    public ambientLight: THREE.AmbientLight | undefined;
     public hemisphereLight: THREE.HemisphereLight | undefined;
     private deletionQueue: (string | ExtendedObject3D)[] = [];
-    private backgroundTexture: Texture;
+    private readonly backgroundTexture: Texture;
 
 
 
     constructor() {
         super({key: "GameScene", enableXR: false});
         this.universe = createUniverse<ComponentMap, SystemList>();
-        this.backgroundTexture = new THREE.TextureLoader().load("/textures/background.png");
+        this.backgroundTexture = new THREE.TextureLoader().load("/textures/background5.jpg");
     }
 
     public async init() {
@@ -53,14 +54,19 @@ class GameLevel extends Scene3D {
         // set up scene (light, ground, grid, sky)
         const {
             ground, lights
-        } = await this.warpSpeed("-orbitControls", "-camera", "-lookAtCenter", "-sky", "-fog", "-grid");
+        } = await this.warpSpeed("-orbitControls", "-camera", "-lookAtCenter", "-fog", "-sky");
         ground!.userData[platformTag] = true;
         this.directionalLight = lights?.directionalLight;
         this.hemisphereLight = lights?.hemisphereLight;
 
+        this.ambientLight = new THREE.AmbientLight(new Color(0xffffff), 0.6);
+
+        this.scene.add(this.ambientLight)
+        // this.hemisphereLight = lights?.hemisphereLight;
+
         // set up background
         this.scene.background = this.backgroundTexture;
-        this.setBackground(this.scene, 1673, 936);
+        this.setBackground(this.scene, 7000, 3346);
 
 
             // enable physics debug if running locally or with console command

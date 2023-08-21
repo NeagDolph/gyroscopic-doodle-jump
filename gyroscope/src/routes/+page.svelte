@@ -4,8 +4,10 @@
 	import {initWebgl, setRotation} from "./model.ts";
 	import {onMount} from 'svelte';
 	import {initDoodleJump} from "./doodle_jump/main";
+	import {setBetaRotation} from "./movementStore";
 
 	let doodleJumpInitiated = false;
+	let controlsInitiated = false;
 
 	let peerConnection;
 	let sessionId;
@@ -29,8 +31,8 @@
 	// let connectionState = ConnectionState.Idle;
 	// let connectionType = ConnectionType.Unknown;
 
-	let connectionState = ConnectionState.Connected;
-	let connectionType = ConnectionType.Initiator;
+	let connectionState = ConnectionState.Idle;
+	let connectionType = ConnectionType.Unknown;
 
 	function getAccel() {
 		if (!DeviceMotionEvent || !DeviceMotionEvent.requestPermission) {
@@ -83,12 +85,17 @@
 	function receiveMessage(event) {
 		gyroData = JSON.parse(event.data);
 
-		setRotation(gyroData.alpha, gyroData.beta, gyroData.gamma, gyroData.reset, gyroData.orientation)
+		if (gyroData.orientation !== undefined || controlsInitiated) {
+			controlsInitiated = true;
+			setBetaRotation(gyroData.beta, gyroData.gamma);
+		}
+
+		// setRotation(gyroData.alpha, gyroData.beta, gyroData.gamma, gyroData.reset, gyroData.orientation)
 	}
 
 	onMount(() => {
 		// initWebgl(canvas);
-        initDoodleJump()
+        // initDoodleJump()
 
 	})
 
