@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, collection, setDoc, addDoc, onSnapshot, getDocs } from 'firebase/firestore';
+import {initializeApp} from 'firebase/app';
+import {getFirestore, doc, collection, setDoc, addDoc, onSnapshot, getDocs} from 'firebase/firestore';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -23,9 +23,12 @@ export async function initiateConnection(callback: (sendChannel: RTCDataChannel)
     await setDoc(sessionRef, {});
 
     const peerConnection = setupPeerConnection(sessionRef);
+
     setupDataChannel(peerConnection, callback);
 
     await createAndSetOffer(peerConnection, sessionRef);
+
+    console.log("Listening for answers")
 
     listenForAnswers(sessionRef, peerConnection);
 
@@ -51,7 +54,28 @@ function generateSessionId() {
 
 // Set up peer connection and its listeners
 function setupPeerConnection(sessionRef: any): RTCPeerConnection {
-    const configuration = { iceServers: [{ urls: 'stun:stun.ekiga.net' }] };
+    const configuration = {
+        iceServers: [
+            {
+                urls: 'stun:stun.ekiga.net'
+            },
+            {
+                urls: 'turn:turn.bistri.com:80',
+                credential: 'homeo',
+                username: 'homeo'
+            },
+            {
+                urls: 'turn:turn.anyfirewall.com:443?transport=tcp',
+                credential: 'webrtc',
+                username: 'webrtc'
+            },
+            {
+                urls: 'turn:numb.viagenie.ca',
+                credential: 'muazkh',
+                username: 'webrtc@live.com'
+            },
+        ]
+    };
     const peerConnection = new RTCPeerConnection(configuration);
 
     peerConnection.oniceconnectionstatechange = () => {
@@ -125,7 +149,7 @@ async function connectToExistingSession(sessionId: string, sessionRef: any) {
 
     console.log('Offer received:', offer);
 
-    const configuration = { iceServers: [{ urls: 'stun:stun.ekiga.net' }] };
+    const configuration = {iceServers: [{urls: 'stun:stun.ekiga.net'}]};
     const peerConnection: RTCPeerConnection = new RTCPeerConnection(configuration);
 
     peerConnection.oniceconnectionstatechange = () => {

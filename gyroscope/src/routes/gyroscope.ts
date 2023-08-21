@@ -1,41 +1,42 @@
-export async function initGyroscope() {
+let reset = false;
 
+export async function initGyroscope(dataChannel: RTCDataChannel) {
+    await streamGyroscopeData(dataChannel);
 }
 
-// Function to check gyroscope support and start streaming data
-async function streamGyroscopeData(peerConnection: RTCPeerConnection) {
-    // Check if Gyroscope API is supported
-    if ('Gyroscope' in window) {
-        try {
-            // Initialize gyroscope sensor
-            // @ts-ignore
-            const gyroscope = new window.Gyroscope({ frequency: 60 }); // 60 readings per second
+export function queueReset() {
+    reset = true;
+}
 
-            // Gyroscope data event listener
-            gyroscope.onreading = () => {
-                const gyroscopeData = {
-                    x: gyroscope.x,
-                    y: gyroscope.y,
-                    z: gyroscope.z
-                };
-                sendDataOverRTC(peerConnection, gyroscopeData);
-            };
+function getOrientation() {
+    if (screen && screen.orientation) {
+        return screen.orientation.type;
+    }
 
-            // Start the gyroscope
-            gyroscope.start();
-        } catch (error) {
-            console.error("Error accessing the Gyroscope sensor:", error);
-        }
-    } else {
-        console.log("Gyroscope not supported on this device");
+    if (window.orientation) {
+        return window.orientation
     }
 }
 
+// Function to check gyroscope support and start streaming data
+async function streamGyroscopeData(dataChannel: RTCDataChannel) {
+    // Check if Gyroscope API is supported
+        try {
+            window.addEventListener('deviceorientation', (event) => {
+                const data = {
+                    alpha: event.alpha,
+                    beta: event.beta,
+                    gamma: event.gamma,
+                    orientation: getOrientation(),
+                    reset: reset
+                }
 
-function sendDataOverRTC(peerConnection: RTCPeerConnection, data: any) {
-    const dataChannel = peerConnection.createDataChannel("gyroscopeDataChannel");
+                if (reset) reset = false;
 
-    dataChannel.onopen = () => {
-        dataChannel.send(JSON.stringify(data));
-    };
+                dataChannel.send(JSON.stringify(data));
+            }, true);
+
+        } catch (error) {
+            console.error("Error accessing the Gyroscope sensor:", error);
+        }
 }

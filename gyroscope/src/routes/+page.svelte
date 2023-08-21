@@ -1,89 +1,96 @@
-<script lang="ts">
-    import {initiateConnection, connectSession} from "./connection.ts"
+<script>
+	import {initiateConnection, connectSession} from "./connection.ts"
+	import {initGyroscope, queueReset} from "./gyroscope.ts";
+	import {initWebgl, setRotation} from "./model.ts";
+	import {onMount} from 'svelte';
+	import {initDoodleJump} from "./doodle_jump/main";
 
-    let peerConnection;
-    let sessionId;
-    let dataChannel;
+	let doodleJumpInitiated = false;
 
-    let connectionState = ConnectionState.Idle;
+	let peerConnection;
+	let sessionId;
+	let dataChannel;
+	let canvas;
 
-    enum ConnectionState {
-        Connected,
-        Connecting,
-        Idle,
-    }
+	let gyroData;
 
-    function getAccel(){
-        if (!DeviceMotionEvent || !DeviceMotionEvent.requestPermission) {
-            return;
-        }
+	const ConnectionState = {
+		Idle: 0,
+		Connecting: 1,
+		Connected: 2,
+	}
 
-        DeviceMotionEvent.requestPermission().then(response => {
-            if (response == 'granted') {
-                console.log("accelerometer permission granted");
-                // Do stuff here
-            }
-        });
-    }
+	const ConnectionType = {
+		Unknown: 0,
+		Initiator: 1,
+		Connector: 2,
+	}
 
+	// let connectionState = ConnectionState.Idle;
+	// let connectionType = ConnectionType.Unknown;
 
-    async function connect() {
-        getAccel();
+	let connectionState = ConnectionState.Connected;
+	let connectionType = ConnectionType.Initiator;
 
+	function getAccel() {
+		if (!DeviceMotionEvent || !DeviceMotionEvent.requestPermission) {
+			return;
+		}
 
-        sessionId = prompt('Enter session code:');
+		DeviceMotionEvent.requestPermission().then(response => {
+			if (response === 'granted') {
+				console.log("accelerometer permission granted");
+				// Do stuff here
+			}
+		});
+	}
 
-        connectionState = ConnectionState.Connecting;
-        peerConnection = await connectSession(sessionId, connectionSuccess);
-    }
+	async function connect() {
+		connectionType = ConnectionType.Connector;
+		getAccel();
+		sessionId = prompt('Enter session code:').trim().toLowerCase();
 
-    async function init() {
-        const {id, connection} = await initiateConnection(connectionSuccess);
-        connectionState = ConnectionState.Connecting;
+		connectionState = ConnectionState.Connecting;
+		connectSession(sessionId, connectionSuccess).then((p) => {
+			peerConnection = p;
+		})
+	}
 
-        sessionId = id;
-        peerConnection = connection;
-    }
+	async function init() {
+		connectionType = ConnectionType.Initiator;
 
-    function connectionSuccess(sendChannel: RTCDataChannel) {
-        connectionState = ConnectionState.Connected;
-        dataChannel = sendChannel;
+		const {id, connection} = await initiateConnection(connectionSuccess);
+		connectionState = ConnectionState.Connecting;
 
-        dataChannel.onmessage = receiveMessage;
-    }
+		sessionId = id;
+		peerConnection = connection;
+	}
 
-    let messages = []
+	function connectionSuccess(sendChannel) {
+		connectionState = ConnectionState.Connected;
+		dataChannel = sendChannel;
 
-    let messageInputValue;
+		dataChannel.onmessage = receiveMessage;
 
-    function sendMessage() {
-        dataChannel.send(messageInputValue);
+		if (!doodleJumpInitiated && connectionType === ConnectionType.Initiator) {
+			initDoodleJump();
+			doodleJumpInitiated = true;
+		}
 
+		initGyroscope(sendChannel);
+	}
 
-        console.log("Sent:", messageInputValue)
+	function receiveMessage(event) {
+		gyroData = JSON.parse(event.data);
 
-        const newMessage = {
-            self: true,
-            message: messageInputValue + ""
-        }
+		setRotation(gyroData.alpha, gyroData.beta, gyroData.gamma, gyroData.reset, gyroData.orientation)
+	}
 
-        messages[messages.length] = newMessage;
+	onMount(() => {
+		// initWebgl(canvas);
+        initDoodleJump()
 
-        messageInputValue = "";
-    }
-
-    function receiveMessage(event: MessageEvent) {
-        console.log("Received:", event.data)
-
-        const newMessage = {
-            self: false,
-            message: event.data + ""
-        }
-
-
-        messages[messages.length] = newMessage;
-    }
-
+	})
 
 
 </script>
@@ -94,10 +101,13 @@
 </svelte:head>
 
 <section>
-    <h1>
+
+    <h1 class:hidden={connectionType === ConnectionType.Initiator && connectionState === ConnectionState.Connected}>
         Gyroscope<br/>
 
-        Connect or initiate a session
+        Connect or initiate a session<br>
+
+        Connection: {Object.keys(ConnectionState)[connectionState]}<br/>
 
         {#if sessionId !== undefined}
             <br/>
@@ -105,25 +115,50 @@
         {/if}
     </h1>
 
-    <button on:click={connect} class="controls">Connect</button>
-    <button on:click={init} class="controls">Initiate connection</button>
 
-    {#if connectionState === ConnectionState.Connected}
-        <div id="chatArea">
-            <div id="messages">
-                {#each messages as {message, self}}
-                    <div>
-                        {self ? "Sent" : "Received"}: {message}
-                    </div>
-                {/each}
-            </div>
-            <input type="text" id="messageInput" bind:value={messageInputValue}/>
-            <button id="sendMessage" on:click={sendMessage} class="send">Send</button>
-        </div>
+    <div id="app"
+         class:hidden={connectionType !== ConnectionType.Initiator || connectionState !== ConnectionState.Connected}></div>
+    <div id="debug"></div>
+
+    <!--    <canvas bind:this={canvas} id="canvas3d" class={gyroData === undefined && "hidden"} width="100%" height="400"-->
+    <!--            style="height: 400px; width: 100%"></canvas>-->
+
+    {#if gyroData !== undefined && false}
+        <h2>
+            alpha: {Math.round(10 * gyroData.alpha) / 10},<br/>
+            beta: {Math.round(10 * gyroData.beta) / 10},<br/>
+            gamma: {Math.round(10 * gyroData.gamma) / 10},<br/>
+            orientation: {gyroData.orientation}
+        </h2>
     {/if}
+
+    {#if connectionType === ConnectionType.Connector && connectionState === ConnectionState.Connected}
+        <button on:click={queueReset} class="controls">Reset Rotation</button>
+    {/if}
+
+    <div class="center" class:hidden={connectionType === ConnectionType.Initiator && connectionState === ConnectionState.Connected}>
+        <button on:click={connect} class="controls">Connect</button>
+        <button on:click={init} class="controls" style="text-wrap: nowrap">Initiate connection</button>
+    </div>
 </section>
 
 <style>
+    .center {
+        width: 100%;
+        justify-content: center;
+        display: flex;
+    }
+
+    #app {
+        position: fixed;
+        top: 0;
+        left: 0;
+    }
+
+    .hidden {
+        display: none;
+    }
+
     section {
         display: flex;
         flex-direction: column;
