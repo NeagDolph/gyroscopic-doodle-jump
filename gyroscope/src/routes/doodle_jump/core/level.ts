@@ -1,4 +1,4 @@
-import {ExtendedObject3D, Scene3D, THREE} from "enable3d";
+import {ExtendedMesh, ExtendedObject3D, Scene3D, THREE} from "enable3d";
 import {createUniverse, Universe} from "necst";
 import {DebugDisplay} from "../ui/DebugDisplay";
 import type {ComponentMap, SystemList} from "../$types";
@@ -10,22 +10,83 @@ import {createPlatformGenerator} from "../entities/createPlatformGenerator";
 import {getGameConfig} from "./config";
 import {createShadowUpdaterSystem} from "../systems/createShadowUpdaterSystem";
 import {createPersistenceSystem} from "../systems/createPersistenceSystem";
-import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, Texture} from "three";
+import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, Texture, TextureLoader, Vector3} from "three";
+import {game, gamePaused} from "../../store/gameStore";
+import {loadModel} from "./loader";
+import { toast } from '@zerodevx/svelte-toast'
+
+export type Assets = {
+    playerModel: Mesh,
+    boostTexture: Texture,
+    platformTexture: Texture,
+    backgroundTexture: Texture
+}
 
 class GameLevel extends Scene3D {
     public universe: Universe<ComponentMap, SystemList>;
     public directionalLight: THREE.DirectionalLight | undefined;
     public ambientLight: THREE.AmbientLight | undefined;
     public hemisphereLight: THREE.HemisphereLight | undefined;
+    public wall: Mesh;
     private deletionQueue: (string | ExtendedObject3D)[] = [];
-    private readonly backgroundTexture: Texture;
 
+    private lastPausedState: boolean;
+    private gamePaused: boolean;
+    private playerMotion: Vector3;
+    private pausedTime: number;
+
+    private textureLoader: TextureLoader;
+
+    private backgroundTexture: Texture;
+    private boostTexture: Texture;
+    private platformTexture: Texture;
+    private playerModel: Mesh;
+    private stopped: boolean = false;
+    public assets: Assets;
 
 
     constructor() {
         super({key: "GameScene", enableXR: false});
         this.universe = createUniverse<ComponentMap, SystemList>();
-        this.backgroundTexture = new THREE.TextureLoader().load("/textures/background5.jpg");
+
+        const unsub = gamePaused.subscribe(v => {
+            this.gamePaused = v
+
+            if (this.gamePaused) {
+                this.stopped = true;
+                this.renderer.setAnimationLoop(null);
+            }
+
+            if (!this.gamePaused && this.stopped) {
+                this.renderer.setAnimationLoop(() => {this._update()});
+            }
+        });
+
+        this.textureLoader = new THREE.TextureLoader();
+
+        this.lastPausedState = false;
+        this.gamePaused = false;
+
+        game.set(this);
+    }
+
+
+    async preload() {
+        this.backgroundTexture = await this.textureLoader.loadAsync("/textures/background.jpg");
+        this.boostTexture = await this.textureLoader.loadAsync("/textures/boost.jpg");
+        this.platformTexture = await this.textureLoader.loadAsync("/textures/platform.jpg");
+        this.playerModel = await loadModel('/models/doodle_jump.glb');
+
+        this.assets = {
+            boostTexture: this.boostTexture,
+            platformTexture: this.platformTexture,
+            backgroundTexture: this.backgroundTexture,
+            playerModel: this.playerModel
+        }
+
+
+        this.scene.background = this.assets.backgroundTexture;
+        this.setBackground(this.scene, 7000, 3346);
     }
 
     public async init() {
@@ -61,15 +122,17 @@ class GameLevel extends Scene3D {
 
         this.ambientLight = new THREE.AmbientLight(new Color(0xffffff), 0.6);
 
-        this.scene.add(this.ambientLight)
+        this.scene.add(this.ambientLight);
         // this.hemisphereLight = lights?.hemisphereLight;
 
         // set up background
-        this.scene.background = this.backgroundTexture;
-        this.setBackground(this.scene, 7000, 3346);
+
+        // console.log("assets", this.assets)
+        // this.scene.background = this.assets.backgroundTexture;
+        // this.setBackground(this.scene, 7000, 3346);
 
 
-            // enable physics debug if running locally or with console command
+        // enable physics debug if running locally or with console command
         // this.physics.debug!.enable();
         (window as any)["enablePhysicsDebug"] = () => this.physics.debug!.enable();
         (window as any)["disablePhysicsDebug"] = () => this.physics.debug!.disable();
@@ -90,14 +153,10 @@ class GameLevel extends Scene3D {
         );
         this.universe.scheduleSystem("persistenceSystem", 5, "seconds");
 
-        // const factor = 1;
-        // this.scene.background.offset.x = factor > 1 ? (1 - 1 / factor) / 2 : 0;
-        // this.scene.background.offset.y = factor > 1 ? 0 : (1 - factor) / 2;
-        //
-        // this.scene.background.repeat.x = factor > 1 ? 1 / factor : 1;
-        // this.scene.background.repeat.y = factor > 1 ? 1 : factor;
-
         createPlatformGenerator(this);
+
+        // this.createWalls()
+
         createPlayer(this, new Vec3());
     }
 
@@ -117,6 +176,7 @@ class GameLevel extends Scene3D {
         }
         this.deletionQueue = [];
 
+
         const platformTag = getGameConfig("OBJECT.TAG.PLATFORM", false);
         const platformCount = this.scene.children.filter(obj => {
             return !!obj.userData[platformTag];
@@ -133,24 +193,22 @@ class GameLevel extends Scene3D {
     }
 
     private setBackground(scene, backgroundImageWidth, backgroundImageHeight) {
-        var windowSize = function(withScrollBar) {
+        var windowSize = function (withScrollBar) {
             var wid = 0;
             var hei = 0;
             if (typeof window.innerWidth != "undefined") {
                 wid = window.innerWidth;
                 hei = window.innerHeight;
-            }
-            else {
+            } else {
                 if (document.documentElement.clientWidth == 0) {
                     wid = document.body.clientWidth;
                     hei = document.body.clientHeight;
-                }
-                else {
+                } else {
                     wid = document.documentElement.clientWidth;
                     hei = document.documentElement.clientHeight;
                 }
             }
-            return { width: wid - (withScrollBar ? (wid - document.body.offsetWidth + 1) : 0), height: hei };
+            return {width: wid - (withScrollBar ? (wid - document.body.offsetWidth + 1) : 0), height: hei};
         };
 
         if (scene.background) {
@@ -164,6 +222,33 @@ class GameLevel extends Scene3D {
             scene.background.repeat.x = factor > 1 ? 1 / factor : 1;
             scene.background.repeat.y = factor > 1 ? 1 : factor;
         }
+    }
+
+    private createWalls() {
+        const at = new Vec3(6, 0, 0);
+
+        const geometry = new THREE.BoxGeometry(1, 50, 50);
+        const material = new THREE.MeshBasicMaterial({ color: 0xFF0000 }); // Make it invisible
+
+        // Create an ExtendedMesh and an ExtendedObject3D to contain it
+        const mesh = new THREE.Mesh(geometry, material);
+        const object3D = new ExtendedObject3D();
+        object3D.add(mesh);
+        object3D.position.copy(at);
+
+        this.wall = object3D;
+
+        // Add physics to the object. Set collisionFlags to 1 for static.
+        this.physics.add.existing(object3D, {
+            shape: "box",
+            width: 0.1,
+            height: 100,
+            depth: 20,
+            collisionFlags: 1
+        });
+
+        // Add the object to the level
+        this.add.existing(object3D);
     }
 }
 

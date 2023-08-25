@@ -1,5 +1,6 @@
+import {debugContent} from "../../store/debugStore";
+
 export class DebugDisplay {
-    // private static readonly domElement = document.getElementById("debug")!;
     private static content: Map<string, any> = new Map();
 
     public static setup() {
@@ -20,8 +21,7 @@ export class DebugDisplay {
             text += `${ key }=${ typeof value === "object" ? JSON.stringify(value) : value }\n`;
         });
 
-        // this.domElement.style.display = "block";
-        // this.domElement.innerText = text;
+        debugContent.set(text)
     }
 
     public static clear() {

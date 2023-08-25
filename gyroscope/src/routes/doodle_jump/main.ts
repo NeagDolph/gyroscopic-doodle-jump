@@ -1,5 +1,5 @@
 import "./style.css";
-import {PhysicsLoader as AmmoPhysicsLoader, Project} from "enable3d";
+import {PhysicsLoader, Project} from "enable3d";
 import {GameLevel} from "./core/level";
 import {loadGameConfig} from "./core/config";
 
@@ -14,6 +14,6 @@ export function initDoodleJump() {
             scenes: [GameLevel],
             antialias: true
         };
-        AmmoPhysicsLoader('/lib/ammo', () => new Project(config));
+        PhysicsLoader('/lib/ammo', () => new Project(config));
     });
 }

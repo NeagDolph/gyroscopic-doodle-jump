@@ -1,12 +1,19 @@
 let betaRotation: number = 0;
 
-export function setBetaRotation(rot: number, gamma: number) {
+type Orientation = 90 | -90 | undefined | 0;
+
+export function setBetaRotation(rot: number, gamma: number, orientation: Orientation) {
+    let tempRotation
+
+    // Protection for gimbal lock in case phone is tilted backwards
     if (gamma > 1 && Math.abs(rot) > 110) {
-        betaRotation = rot > 0 ? 180 - rot : (-180 - rot);
-        return;
+        tempRotation = rot > 0 ? 180 - rot : (-180 - rot);
+    } else {
+        tempRotation = rot;
     }
 
-    betaRotation = rot;
+    // In case phone is rotated to other side
+    betaRotation = orientation === -90 ? -tempRotation : tempRotation;
 }
 
 export function getBetaRotation(): number {

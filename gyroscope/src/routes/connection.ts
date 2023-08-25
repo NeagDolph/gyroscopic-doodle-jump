@@ -17,8 +17,7 @@ const db = getFirestore(app);
 
 
 // Create a new session
-export async function initiateConnection(callback: (sendChannel: RTCDataChannel) => void) {
-    const sessionId = generateSessionId();
+export async function initiateConnection(sessionId, callback: (sendChannel: RTCDataChannel) => void) {
     const sessionRef = doc(db, 'sessions', sessionId);
     await setDoc(sessionRef, {});
 
@@ -32,7 +31,7 @@ export async function initiateConnection(callback: (sendChannel: RTCDataChannel)
 
     listenForAnswers(sessionRef, peerConnection);
 
-    return {connection: peerConnection, id: sessionId};
+    return {connection: peerConnection};
 }
 
 
@@ -42,14 +41,21 @@ export async function connectSession(sessionId: string, callback: (sendChannel: 
 
     const peerConnection = await connectToExistingSession(sessionId, sessionRef);
 
+    if (peerConnection === null) return;
+
     setupDataChannelListener(peerConnection, callback);
 
     return peerConnection
 }
 
-// Generate a session ID
-function generateSessionId() {
-    return Math.random().toString(36).substring(2, 6);
+export function generateSessionId() {
+    let num = "";
+
+    for (let i = 0; i < 7; i++) {
+        num += Math.floor(Math.random() * 10);
+    }
+
+    return num;
 }
 
 // Set up peer connection and its listeners
@@ -70,13 +76,35 @@ function setupPeerConnection(sessionRef: any): RTCPeerConnection {
 
     peerConnection.oniceconnectionstatechange = () => {
         console.log(`ICE connection state: ${peerConnection.iceConnectionState}`);
+        if (peerConnection.iceConnectionState === 'disconnected' ||
+            peerConnection.iceConnectionState === 'failed' ||
+            peerConnection.iceConnectionState === 'closed') {
+            console.log('ICE Connection was lost. Terminating connection.');
+
+            const event = new CustomEvent("disconnected");
+            document.dispatchEvent(event);
+        }
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+        console.log(`Connection state: ${peerConnection.connectionState}`);
+
+        if (peerConnection.connectionState === 'disconnected' ||
+            peerConnection.connectionState === 'failed' ||
+            peerConnection.connectionState === 'closed') {
+            console.log('Connection was lost. Terminating connection.');
+
+            const event = new CustomEvent("disconnected");
+            document.dispatchEvent(event);
+        }
     };
 
     peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
             console.log("Ice candidates sent");
-            addDoc(collection(sessionRef, 'ice-candidates'), event.candidate.toJSON());
 
+            // @ts-ignore
+            addDoc(collection(sessionRef, 'ice-candidates'), event.candidate.toJSON());
         }
     };
 
@@ -89,9 +117,6 @@ function setupDataChannel(peerConnection: RTCPeerConnection, callback: (sendChan
     sendChannel.onopen = (e) => {
         console.log("Channel Opened", e);
         callback(sendChannel)
-    };
-    sendChannel.onclose = (e) => {
-        console.log("Channel Close", e);
     };
 }
 
@@ -123,18 +148,34 @@ function listenForAnswers(sessionRef: any, peerConnection: RTCPeerConnection) {
                 console.log('Answer received:', answer);
 
                 await peerConnection.setRemoteDescription(answer);
-                console.log('Remote description set:', peerConnection.remoteDescription);
+                console.log('Remote description set:', peerConnection.remoteDescription)
+
+                const event = new CustomEvent("connectionState", {detail: {message: 2}});
+                document.dispatchEvent(event);
             }
         });
     });
 }
 
 // Connect to an existing session by its ID
-async function connectToExistingSession(sessionId: string, sessionRef: any) {
+async function connectToExistingSession(sessionId: string, sessionRef: any): Promise<RTCPeerConnection | null> {
     console.log('Connecting to session:', sessionId);
 
     const offersSnapshot = await getDocs(collection(sessionRef, 'offers'));
+
+    if (offersSnapshot.empty) {
+        console.log("No RTC offers available");
+        const event = new CustomEvent("noOffers", {detail: {message: sessionId}});
+        document.dispatchEvent(event);
+
+        return null;
+    }
+
+    const event = new CustomEvent("connectionState", {detail: {message: 2}});
+    document.dispatchEvent(event);
+
     const offerData = offersSnapshot.docs[0].data();
+
     const offer = new RTCSessionDescription(offerData.offer);
 
     console.log('Offer received:', offer);

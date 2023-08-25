@@ -7,83 +7,71 @@ import {DebugDisplay} from "../ui/DebugDisplay";
 import {EntitySystem} from "necst";
 import type {ComponentMap, SystemList} from "../$types";
 import {getGameConfig} from "../core/config";
-import {loadModel} from "../core/loader";
 import {Material, Mesh} from "three";
 import {getBetaRotation} from "../../movementStore";
-import {initDoodleJump} from "../main";
+import {gamePaused} from "../../store/gameStore";
 
 export function createPlayer(level: GameLevel, at: Vec3) {
     const playerName = getGameConfig("OBJECT.NAME.PLAYER", false);
     const jumpSensorName = getGameConfig("OBJECT.NAME.PLAYER_JUMP_SENSOR", false);
     const starsKey = getGameConfig("STORAGE.KEY.STARS", false);
 
-    loadModel('/models/doodle_jump.glb').then((model: Mesh) => {
+    const mesh: Mesh = level.assets.playerModel;
+    mesh.scale.set(0.45, 0.45, 0.45);
+    mesh.position.set(0, -1, -0.1)
+    mesh.rotateY(-0.4);
 
-        // const geometry = new THREE.CapsuleGeometry(.5, 1);
-        //
-        //
-        // const material = new THREE.MeshLambertMaterial({
-        //     color: 0xffff00
-        // });
+    // const mesh = new ExtendedMesh(geometry, material);
 
-        const mesh: Mesh = model;
-        mesh.scale.set(0.45, 0.45, 0.45);
-        mesh.position.set(0, -1, -0.1)
-        mesh.rotateY(-0.4);
+    mesh.castShadow = mesh.receiveShadow = true;
 
-        // const mesh = new ExtendedMesh(geometry, material);
+    const object3D = new ExtendedObject3D();
+    object3D.add(mesh);
+    at.y++;
+    object3D.position.copy(at);
+    object3D.name = playerName;
 
-        mesh.castShadow = mesh.receiveShadow = true;
+    const item = level.physics.add.existing(object3D, {
+        shape: "convexMesh",
+        mass: 90,
+        restitution: 5,
+        collisionFlags: 4
+    });
+    level.add.existing(object3D);
+    object3D.body.setLinearFactor(1, 1, 0);
+    object3D.body.setAngularFactor(0, 0, 0);
+    object3D.body.setFriction(0);
 
-        const object3D = new ExtendedObject3D();
-        object3D.add(mesh);
-        at.y++;
-        object3D.position.copy(at);
-        object3D.name = playerName;
+    const sensor = new ExtendedObject3D();
+    sensor.name = jumpSensorName;
+    level.physics.add.existing(sensor, {
+        shape: "box",
+        width: .8,
+        height: 0.4,
+        restitution: 5,
+        depth: .8,
+        collisionFlags: 4,
+        // mass: 100
+        mass: 1e-8
+    });
+    level.physics.add.constraints.fixed(sensor.body, object3D.body, true);
 
-        level.physics.add.existing(object3D, {
-            shape: "convexMesh",
-            mass: 90,
-            restitution: 5,
-            collisionFlags: 4
-        });
-        level.add.existing(object3D);
-        object3D.body.setLinearFactor(1, 1, 0);
-        object3D.body.setAngularFactor(0, 0, 0);
-        object3D.body.setFriction(0);
+    const uuid = level.universe.createEntity();
+    level.universe.attachComponent(uuid, "player", {
+        altitude: 0,
+        isOnPlatform: false,
+        isOnBoostPlatform: false,
+        starsCollected: parseInt(localStorage.getItem(starsKey) ?? "0"),
+        fallen: false
+    });
+    level.universe.attachComponent(uuid, "inputReceiver", createInputReceiver());
+    level.universe.attachComponent(uuid, "physicsObject", object3D);
+    level.universe.attachComponent(uuid, "collisionSensor", {active: false, obj: sensor});
+    level.universe.attachComponent(uuid, "cameraDirector", {
+        position: Vec3.fromVec(object3D.position)
+    });
 
-        const sensor = new ExtendedObject3D();
-        sensor.name = jumpSensorName;
-        level.physics.add.existing(sensor, {
-            shape: "box",
-            width: .8,
-            height: 0.4,
-            restitution: 5,
-            depth: .8,
-            collisionFlags: 4,
-            // mass: 100
-            mass: 1e-8
-        });
-        level.physics.add.constraints.fixed(sensor.body, object3D.body, true);
-
-        const uuid = level.universe.createEntity();
-        level.universe.attachComponent(uuid, "player", {
-            altitude: 0,
-            isOnPlatform: false,
-            isOnBoostPlatform: false,
-            starsCollected: parseInt(localStorage.getItem(starsKey) ?? "0"),
-            fallen: false
-        });
-        level.universe.attachComponent(uuid, "inputReceiver", createInputReceiver());
-        level.universe.attachComponent(uuid, "physicsObject", object3D);
-        level.universe.attachComponent(uuid, "collisionSensor", {active: false, obj: sensor});
-        level.universe.attachComponent(uuid, "cameraDirector", {
-            position: Vec3.fromVec(object3D.position)
-        });
-
-        level.universe.registerSystem("playerSystem", createPlayerSystem());
-
-    })
+    level.universe.registerSystem("playerSystem", createPlayerSystem());
 }
 
 function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
@@ -97,6 +85,9 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
     const maxVSpace = getGameConfig("PLATFORM.GENERATION.MAX_VERTICAL_SPACE", true);
     const maxAltitudeKey = getGameConfig("STORAGE.KEY.MAX_ALTITUDE", false);
     const starsKey = getGameConfig("STORAGE.KEY.STARS", false);
+
+    let paused = false;
+    // gamePaused.subscribe(v => paused = v);
 
     return ({createView, handleCommand}) => {
         const view = createView(
@@ -140,12 +131,11 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
             const horizontalMovement = getBetaRotation() / 20;
 
 
-
-
             const xVel = lerp(
                 physicsObject.body.velocity.x, playerSpeed * horizontalMovement,
                 playerAcceleration
             );
+
             physicsObject.body.setVelocityX(xVel);
 
             // jumping if close to ground and falling

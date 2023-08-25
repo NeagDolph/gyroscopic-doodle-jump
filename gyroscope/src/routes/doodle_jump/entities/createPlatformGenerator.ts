@@ -17,10 +17,8 @@ export function createPlatformGenerator(level: GameLevel) {
     const relMaxAlt = getGameConfig("PLATFORM.GENERATION.RELATIVE_MAX_ALTITUDE", true);
     const collectableChance = getGameConfig("COLLECTABLE.GENERATION.CHANCE", true);
 
-    const loader = new TextureLoader();
-
-    const platformTexture = loader.load ('/textures/platform.png')
-    const boostTexture = loader.load("/textures/boost.png")
+    const platformTexture = level.assets.platformTexture;
+    const boostTexture = level.assets.boostTexture;
 
     const textures: PlatformTexturesType = {
         platformTexture: platformTexture,
