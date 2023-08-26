@@ -51,7 +51,7 @@ export async function connectSession(sessionId: string, callback: (sendChannel: 
 export function generateSessionId() {
     let num = "";
 
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 6; i++) {
         num += Math.floor(Math.random() * 10);
     }
 

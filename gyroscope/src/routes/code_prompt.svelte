@@ -23,10 +23,11 @@
 	const dispatch = createEventDispatcher();
 
 	function handleInput(value) {
-		if (value.length <= 7) {
+		if (value.length <= 6) {
 			code = value;
 		}
-		if (value.length === 7) {
+
+		if (value.length === 6) {
 			dispatch('entered_code', code);
 		}
 	}
@@ -64,7 +65,7 @@
 
     .code-view {
         display: flex;
-        justify-content: start;
+        justify-content: space-between;
         align-items: end;
         height: 50px;
     }
@@ -87,11 +88,11 @@
 </style>
 
 {#if enabled}
-    <div class={enabled ? 'overlay enabled' : 'overlay'}>
+    <div class={enabled ? 'overlay enabled' : 'overlay'} on:click={() => enabled = false}>
         <div class="modal" on:click={focusInput} in:fade out:fade>
             <p>Enter Session ID</p>
             <div class="code-view">
-                {#each [0, 1, 2, 3, 4, 5, 6] as i}
+                {#each [0, 1, 2, 3, 4, 5] as i}
                     <div class="code-digit">{code[i] || ''}</div>
                 {/each}
             </div>
