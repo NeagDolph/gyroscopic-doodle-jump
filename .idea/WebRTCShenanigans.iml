@@ -5,6 +5,8 @@
       <excludeFolder url="file://$MODULE_DIR$/temp" />
       <excludeFolder url="file://$MODULE_DIR$/.tmp" />
       <excludeFolder url="file://$MODULE_DIR$/tmp" />
+      <excludeFolder url="file://$MODULE_DIR$/gyroscope/.svelte-kit" />
+      <excludeFolder url="file://$MODULE_DIR$/gyroscope/.firebase/webrtc-a3965/functions/stylesheets" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
