@@ -15,15 +15,7 @@ export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, t
 
     const geometry = new RoundedBoxGeometry(2, .4, 0.5, 6, 0.5);
 
-    // const material = new THREE.MeshLambertMaterial({color: type.boost ? 0xffff00 : 0xffffff});
-    const material = new THREE.MeshLambertMaterial();
-
-
-    if (type.boost) {
-        material.map = texture.boostTexture;
-    } else {
-        material.map = texture.platformTexture;
-    }
+    const material = new THREE.MeshToonMaterial();
 
     const mesh = new ExtendedMesh(geometry, material);
     // mesh.position.setY(0.4)
@@ -39,6 +31,14 @@ export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, t
         type.breakable = false;
     }
 
+
+    if (type.boost) {
+        material.map = texture.boostTexture;
+    } else {
+        material.map = texture.platformTexture;
+    }
+
+
     level.physics.add.existing(object3D, {
         shape: "box",
         width: 2,
@@ -51,6 +51,22 @@ export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, t
         [platformNumber > 0 && "breakable"]: type.breakable
     })
     level.add.existing(object3D);
+
+    // const object3D: ExtendedObject3D = level.physics.add.box({
+    //     width: 2,
+    //     height: .4,
+    //     depth: 1,
+    //     x: at.x,
+    //     y: at.y,
+    //     z: at.z,
+    //     collisionFlags: type.oscillating || type.breakable ? 2 : 1,
+    //     breakable: type.breakable
+    // }, {
+    //     // lambert: {
+    //     //     color: type.boost ? 0xffff00 : 0xffffff
+    //     // },
+    //     custom: new THREE.MeshToonMaterial({color: type.boost ? 0xffff00 : 0xffffff})
+    // });
 
     object3D.userData[platformTag] = true;
     object3D.userData[boostPlatformTag] = type.boost;

@@ -1,6 +1,6 @@
 <script>
 	import Panel from "./panel.svelte";
-	import {debugContent} from "./store/debugStore";
+	import DebugData from "./components/debug_data.svelte";
 
 </script>
 
@@ -10,9 +10,7 @@
 </svelte:head>
 
 <div>
-    {#if $debugContent !== undefined}
-        <div id="debug">{$debugContent}</div>
-    {/if}
+    <DebugData enabled={true}/>
     <Panel/>
 </div>
 

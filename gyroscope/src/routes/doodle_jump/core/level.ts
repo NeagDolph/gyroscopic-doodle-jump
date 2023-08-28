@@ -115,14 +115,15 @@ class GameLevel extends Scene3D {
         // set up scene (light, ground, grid, sky)
         const {
             ground, lights
-        } = await this.warpSpeed("-orbitControls", "-camera", "-lookAtCenter", "-fog", "-sky");
+        } = await this.warpSpeed("-orbitControls", "-camera", "-lookAtCenter", "-fog", "-sky", "-lights");
         ground!.userData[platformTag] = true;
-        this.directionalLight = lights?.directionalLight;
-        this.hemisphereLight = lights?.hemisphereLight;
+        // this.directionalLight = lights?.directionalLight;
+        // this.hemisphereLight = lights?.hemisphereLight;
 
-        this.ambientLight = new THREE.AmbientLight(new Color(0xffffff), 0.6);
+        this.ambientLight = new THREE.AmbientLight(new Color(0xffffff), 1);
 
         this.scene.add(this.ambientLight);
+
         // this.hemisphereLight = lights?.hemisphereLight;
 
         // set up background
@@ -177,15 +178,15 @@ class GameLevel extends Scene3D {
         this.deletionQueue = [];
 
 
-        const platformTag = getGameConfig("OBJECT.TAG.PLATFORM", false);
-        const platformCount = this.scene.children.filter(obj => {
-            return !!obj.userData[platformTag];
-        }).length;
-        DebugDisplay.update("platform_count", platformCount);
-        const collectableCount = this.physics.rigidBodies.filter(body => {
-            return body.name.startsWith("CollectableSensor_");
-        }).length;
-        DebugDisplay.update("collectable_count", collectableCount);
+        // const platformTag = getGameConfig("OBJECT.TAG.PLATFORM", false);
+        // const platformCount = this.scene.children.filter(obj => {
+        //     return !!obj.userData[platformTag];
+        // }).length;
+        // DebugDisplay.update("platform_count", platformCount);
+        // const collectableCount = this.physics.rigidBodies.filter(body => {
+        //     return body.name.startsWith("CollectableSensor_");
+        // }).length;
+        // DebugDisplay.update("collectable_count", collectableCount);
     }
 
     public deleteEntity(uuid: string, ...attachedObjects: ExtendedObject3D[]) {

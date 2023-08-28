@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "cd gyroscope && vite dev --open"
+    "dev": "cd gyroscope && vite dev --open",
+    "deploy": "firebase deploy",
+    "ngrok": "./ngrok http 5002"
   },
   "repository": {
     "type": "git",

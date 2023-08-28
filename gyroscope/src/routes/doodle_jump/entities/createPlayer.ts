@@ -10,6 +10,7 @@ import {getGameConfig} from "../core/config";
 import {Material, Mesh} from "three";
 import {getBetaRotation} from "../../movementStore";
 import {gamePaused} from "../../store/gameStore";
+import {toast} from '@zerodevx/svelte-toast';
 
 export function createPlayer(level: GameLevel, at: Vec3) {
     const playerName = getGameConfig("OBJECT.NAME.PLAYER", false);
@@ -172,13 +173,16 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
                 // inform that the game is over
                 player.fallen = true;
 
-                // level.uni
-                //
-                // window.document.querySelector("canvas").remove();
-                //
-                // initDoodleJump()
-                // alert("Game Over");
-                // window.location.reload();
+                const event = new CustomEvent("disconnected");
+                document.dispatchEvent(event);
+
+                toast.push('You Died!', {
+                    theme: {
+                        '--toastColor': 'rgba(238,103,103,0.9)',
+                        '--toastBackground': 'rgba(245,245,245,0.9)',
+                        '--toastBarBackground': '#fa3636'
+                    }
+                })
             }
 
             // updating camera director position

@@ -61,16 +61,20 @@ export function generateSessionId() {
 // Set up peer connection and its listeners
 function setupPeerConnection(sessionRef: any): RTCPeerConnection {
     const configuration = {
-        iceServers: [
-            {
-                urls: 'stun:stun.ekiga.net'
-            },
-            {
-                urls: 'turn:numb.viagenie.ca',
-                credential: 'muazkh',
-                username: 'webrtc@live.com'
-            },
-        ]
+        iceServers: [{
+            urls: ["stun:eu-turn6.xirsys.com"]
+        }, {
+            username: "L7nsjZY69N-jee6tzOdYL0-OUuYEycA381zZHifWtNwHApwJ7tKvE7eWe2i5EiPjAAAAAGTqgadhYmNkaWxvdmVkYW4=",
+            credential: "ec40eff6-4462-11ee-aeb3-0242ac140004",
+            urls: [
+                "turn:eu-turn6.xirsys.com:80?transport=udp",
+                "turn:eu-turn6.xirsys.com:3478?transport=udp",
+                "turn:eu-turn6.xirsys.com:80?transport=tcp",
+                "turn:eu-turn6.xirsys.com:3478?transport=tcp",
+                "turns:eu-turn6.xirsys.com:443?transport=tcp",
+                "turns:eu-turn6.xirsys.com:5349?transport=tcp"
+            ]
+        }]
     };
     const peerConnection = new RTCPeerConnection(configuration);
 

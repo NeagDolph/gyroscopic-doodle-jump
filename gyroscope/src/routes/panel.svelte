@@ -5,14 +5,14 @@
 	import {onMount, tick} from 'svelte';
 	import {initDoodleJump} from "./doodle_jump/main";
 	import {setBetaRotation} from "./movementStore";
-	import Stats from "./gyroscope_stats.svelte";
-	import LoadingIcon from "./loading_icon.svelte";
-    import CodePrompt from "./code_prompt.svelte";
+	import Stats from "./components/gyroscope_stats.svelte";
+	import LoadingIcon from "./components/loading_icon.svelte";
+    import CodePrompt from "./components/code_prompt.svelte";
 	import {gamePaused, game} from "./store/gameStore";
 	import rotatePhone from "../../static/icons/rotate_phone.svg";
 	import {phoneOrientation} from "./store/gyroscopeStore";
 	import {toast} from '@zerodevx/svelte-toast';
-	import code_prompt from "./code_prompt.svelte";
+	import code_prompt from "./components/code_prompt.svelte";
 
 	const connectionTypes = {
 		0: "Idle",
@@ -168,8 +168,10 @@
 		connectionType = ConnectionType.Unknown;
 		connectionState = ConnectionState.Idle;
 		controlsInitiated = false;
+		phoneOrientation.set(undefined);
 		doodleJumpInitiated = false;
 		connectionStatus = 0;
+		controlsPaused = false;
 	}
 
 	function disconnect() {
@@ -223,12 +225,28 @@
 
 	async function openCodePrompt() {
 		codePromptEnabled = true;
-
-		// await tick();
-
 		promptComponent.focusInput();
     }
 
+	function closeCodePrompt() {
+		codePromptEnabled = false;
+    }
+
+
+	$: invalidOrienatation = ($phoneOrientation === undefined || $phoneOrientation === 180 || $phoneOrientation === 0)
+
+	// Initiate Controls if orientation is unpaused for connector
+    $: {
+		if (!invalidOrienatation) {
+			controlsInitiated = true;
+        }
+    }
+
+	$: {
+		if (invalidOrienatation && controlsPaused) {
+			controlsInitiated = false;
+        }
+    }
 
 </script>
 
@@ -237,7 +255,7 @@
 <div class="container" class:hidden={!$gamePaused && connectedInitiator}>
     <div class="panel-container">
         {#if !connectedConnector}
-            <p class="title">WebRTC Gyroscope Doodle Jump Demo</p>
+            <p class="title">Gyroscrope controlled Doodle Jump Demo</p>
 
             <p class="subtitle">Connect or initiate a session</p>
 
@@ -276,7 +294,7 @@
             </div>
 
         {:else}
-            {#if $phoneOrientation === undefined || $phoneOrientation === 180 || $phoneOrientation === 0}
+            {#if invalidOrienatation && !controlsInitiated}
                 <p class="rotate_phone_message">Rotate Phone to activate tilt controls</p>
 
                 <div class="row-container">
@@ -300,7 +318,7 @@
 
     </div>
 </div>
-<CodePrompt bind:this={promptComponent} enabled={codePromptEnabled} on:entered_code={enteredCode}/>
+<CodePrompt bind:this={promptComponent} enabled={codePromptEnabled} on:entered_code={enteredCode} on:close={closeCodePrompt}/>
 
 <style>
     .session_id {

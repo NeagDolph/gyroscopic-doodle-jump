@@ -31,7 +31,32 @@
 			dispatch('entered_code', code);
 		}
 	}
+
+	function closeModal() {
+		dispatch('close');
+    }
 </script>
+
+{#if enabled}
+    <div class={enabled ? 'overlay enabled' : 'overlay'} on:click={closeModal}>
+        <div class="modal" on:click={focusInput} in:fade out:fade>
+            <p>Enter Session ID</p>
+            <div class="code-view">
+                {#each [0, 1, 2, 3, 4, 5] as i}
+                    <div class="code-digit">{code[i] || ''}</div>
+                {/each}
+            </div>
+            <input
+                    bind:this={inputEl}
+                    type="tel"
+                    pattern="[0-9]*"
+                    inputmode="numeric"
+                    on:input={(e) => handleInput(e.target.value)}
+                    bind:value={inputValue}
+            />
+        </div>
+    </div>
+{/if}
 
 <style>
     .overlay {
@@ -52,7 +77,7 @@
 
     .modal {
         background: white;
-        padding: 1em 2em;
+        padding: 1em 2em 2em 2em;
         border-radius: 0.3em;
         min-width: 300px;
     }
@@ -86,25 +111,3 @@
         margin: 0 0 10px 0;
     }
 </style>
-
-{#if enabled}
-    <div class={enabled ? 'overlay enabled' : 'overlay'} on:click={() => enabled = false}>
-        <div class="modal" on:click={focusInput} in:fade out:fade>
-            <p>Enter Session ID</p>
-            <div class="code-view">
-                {#each [0, 1, 2, 3, 4, 5] as i}
-                    <div class="code-digit">{code[i] || ''}</div>
-                {/each}
-            </div>
-            <input
-                    bind:this={inputEl}
-                    type="tel"
-                    pattern="[0-9]*"
-                    inputmode="numeric"
-                    on:input={(e) => handleInput(e.target.value)}
-                    bind:value={inputValue}
-            />
-        </div>
-    </div>
-
-{/if}
