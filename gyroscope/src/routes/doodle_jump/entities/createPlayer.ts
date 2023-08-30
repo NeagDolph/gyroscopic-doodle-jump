@@ -1,15 +1,15 @@
-import {GameLevel} from "../core/level";
+import type {GameLevel} from "../core/level";
 import {Vec3} from "../core/vec3";
 import {ExtendedMesh, ExtendedObject3D, THREE} from "enable3d";
 import {createInputReceiver} from "../core/input";
 import {lerp} from "../utils";
 import {DebugDisplay} from "../ui/DebugDisplay";
-import {EntitySystem} from "necst";
+import type {EntitySystem} from "necst";
 import type {ComponentMap, SystemList} from "../$types";
 import {getGameConfig} from "../core/config";
-import {Material, Mesh} from "three";
+import type {Material, Mesh} from "three";
 import {getBetaRotation} from "../../movementStore";
-import {gamePaused} from "../../store/gameStore";
+import {gamePaused, score} from "../../store/gameStore";
 import {toast} from '@zerodevx/svelte-toast';
 
 export function createPlayer(level: GameLevel, at: Vec3) {
@@ -35,7 +35,6 @@ export function createPlayer(level: GameLevel, at: Vec3) {
     const item = level.physics.add.existing(object3D, {
         shape: "convexMesh",
         mass: 90,
-        restitution: 5,
         collisionFlags: 4
     });
     level.add.existing(object3D);
@@ -49,10 +48,8 @@ export function createPlayer(level: GameLevel, at: Vec3) {
         shape: "box",
         width: .8,
         height: 0.4,
-        restitution: 5,
         depth: .8,
         collisionFlags: 4,
-        // mass: 100
         mass: 1e-8
     });
     level.physics.add.constraints.fixed(sensor.body, object3D.body, true);
@@ -72,10 +69,10 @@ export function createPlayer(level: GameLevel, at: Vec3) {
         position: Vec3.fromVec(object3D.position)
     });
 
-    level.universe.registerSystem("playerSystem", createPlayerSystem());
+    level.universe.registerSystem("playerSystem", createPlayerSystem(level));
 }
 
-function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
+function createPlayerSystem(level: GameLevel): EntitySystem<ComponentMap, SystemList> {
     const playerSpeed = getGameConfig("PLAYER.MOVEMENT.SPEED", true);
     const playerAcceleration = getGameConfig("PLAYER.MOVEMENT.ACCELERATION", true);
     const playerJumpVelocity = getGameConfig("PLAYER.JUMP.VELOCITY", true);
@@ -83,6 +80,7 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
     const pickupCommand = getGameConfig("COMMAND.COLLECTABLE.PICKUP", false);
     const platformTag = getGameConfig("OBJECT.TAG.PLATFORM", false);
     const boostPlatformTag = getGameConfig("OBJECT.TAG.BOOST_PLATFORM", false);
+    const breakablePlatformTag = getGameConfig("OBJECT.TAG.BREAKABLE_PLATFORM", false);
     const maxVSpace = getGameConfig("PLATFORM.GENERATION.MAX_VERTICAL_SPACE", true);
     const maxAltitudeKey = getGameConfig("STORAGE.KEY.MAX_ALTITUDE", false);
     const starsKey = getGameConfig("STORAGE.KEY.STARS", false);
@@ -108,15 +106,20 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
                 // noinspection TypeScriptValidateJSTypes
                 collisionSensor.obj.body.on.collision((platform, event) => {
 
+
                     if (["start", "collision"].includes(event)) {
-                        player.isOnPlatform = !!(
-                            platform.userData[platformTag]
-                        );
-                        player.isOnBoostPlatform = !!(
-                            platform.userData[boostPlatformTag]
-                        );
+                        if (platform.userData[breakablePlatformTag] && physicsObject.body.velocity.y <= 0) {
+                            level.destroy(platform)
+                        } else {
+                            player.isOnPlatform = !!(
+                                platform.userData[platformTag]
+                            );
+                            player.isOnBoostPlatform = !!(
+                                platform.userData[boostPlatformTag]
+                            );
+                        }
                     } else {
-                        player.isOnPlatform = player.isOnBoostPlatform = false;
+                        player.isOnPlatform = player.isOnBoostPlatform = player.isOnBreakablePlatform = false;
                     }
 
                 });
@@ -129,7 +132,7 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
             //     Number(inputReceiver.keyboard.includes("ArrowRight"))
             // );
 
-            const horizontalMovement = getBetaRotation() / 20;
+            const horizontalMovement = getBetaRotation() / 30;
 
 
             const xVel = lerp(
@@ -161,28 +164,9 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
                     physicsObject.body.setVelocityY(playerJumpVelocity);
                 }
 
-            } else if (physicsObject.position.y < player.altitude - maxVSpace * 2) {
-
-                // save progress
-                const savedMax = localStorage.getItem(maxAltitudeKey) ?? 0;
-                if (player.altitude > savedMax) {
-                    localStorage.setItem(maxAltitudeKey, String(player.altitude));
-                }
-                localStorage.setItem(starsKey, String(player.starsCollected));
-
-                // inform that the game is over
-                player.fallen = true;
-
-                const event = new CustomEvent("disconnected");
+            } else if (physicsObject.position.y < player.altitude - maxVSpace * 1.5) {
+                const event = new CustomEvent("game_end");
                 document.dispatchEvent(event);
-
-                toast.push('You Died!', {
-                    theme: {
-                        '--toastColor': 'rgba(238,103,103,0.9)',
-                        '--toastBackground': 'rgba(245,245,245,0.9)',
-                        '--toastBarBackground': '#fa3636'
-                    }
-                })
             }
 
             // updating camera director position
@@ -199,8 +183,7 @@ function createPlayerSystem(): EntitySystem<ComponentMap, SystemList> {
             });
 
             // printing to debug display
-            DebugDisplay.update("player_altitude", player.altitude);
-            DebugDisplay.update("player_stars", player.starsCollected);
+            score.set(player.altitude);
         }
     };
 }

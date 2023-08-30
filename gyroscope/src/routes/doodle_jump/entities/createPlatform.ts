@@ -5,17 +5,19 @@ import {getGameConfig} from "../core/config";
 import {Mesh, Texture} from "three";
 import {ExtendedMesh, ExtendedObject3D, THREE} from "enable3d";
 import {RoundedBoxGeometry} from "three/examples/jsm/geometries/RoundedBoxGeometry";
+import {ascendingProbability} from "../utils";
 
 export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, texture: PlatformTexturesType, platformNumber: number) {
     const platformOscDistance = getGameConfig("PLATFORM.OSCILLATION.DISTANCE", true);
     const platformOscVelocity = getGameConfig("PLATFORM.OSCILLATION.VELOCITY", true);
     const platformTag = getGameConfig("OBJECT.TAG.PLATFORM", false);
     const boostPlatformTag = getGameConfig("OBJECT.TAG.BOOST_PLATFORM", false);
+    const breakablePlatformTag = getGameConfig("OBJECT.TAG.BREAKABLE_PLATFORM", false);
     const maxVSpace = getGameConfig("PLATFORM.GENERATION.MAX_VERTICAL_SPACE", true);
 
-    const geometry = new RoundedBoxGeometry(2, .4, 0.5, 6, 0.5);
+    const geometry = new RoundedBoxGeometry(1.5, .4, 0.5, 6, 0.5);
 
-    const material = new THREE.MeshToonMaterial();
+    const material = new THREE.MeshPhongMaterial();
 
     const mesh = new ExtendedMesh(geometry, material);
     // mesh.position.setY(0.4)
@@ -32,52 +34,42 @@ export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, t
     }
 
 
-    if (type.boost) {
+    if (type.breakable) {
+        material.map = texture.breakableTexture;
+    } else if (type.boost) {
         material.map = texture.boostTexture;
     } else {
         material.map = texture.platformTexture;
     }
 
-
     level.physics.add.existing(object3D, {
         shape: "box",
-        width: 2,
+        width: 1.5,
         height: .4,
         depth: 0.5,
         // x: at.x,
         // y: at.y,
         // z: at.z,
-        collisionFlags: (type.oscillating || type.breakable) && platformNumber > 0 ? 2 : 1,
-        [platformNumber > 0 && "breakable"]: type.breakable
+        collisionFlags: ((type.oscillating || type.breakable) && platformNumber > 0 ? 2 : 1),
+        breakable: type.breakable
     })
-    level.add.existing(object3D);
 
-    // const object3D: ExtendedObject3D = level.physics.add.box({
-    //     width: 2,
-    //     height: .4,
-    //     depth: 1,
-    //     x: at.x,
-    //     y: at.y,
-    //     z: at.z,
-    //     collisionFlags: type.oscillating || type.breakable ? 2 : 1,
-    //     breakable: type.breakable
-    // }, {
-    //     // lambert: {
-    //     //     color: type.boost ? 0xffff00 : 0xffffff
-    //     // },
-    //     custom: new THREE.MeshToonMaterial({color: type.boost ? 0xffff00 : 0xffffff})
-    // });
+    level.add.existing(object3D);
 
     object3D.userData[platformTag] = true;
     object3D.userData[boostPlatformTag] = type.boost;
+    object3D.userData[breakablePlatformTag] = type.breakable;
 
     object3D.receiveShadow = false;
     object3D.castShadow = false;
 
     const uuid = level.universe.createEntity();
     level.universe.attachComponent(uuid, "physicsObject", object3D);
+
+    const platformSpeed = Math.random() + ascendingProbability(platformNumber);
+
     level.universe.attachComponent(uuid, "platform", {
-        ...type, originalX: at.x, movementDelay: Math.random() * 10
+        ...type, originalX: at.x, movementDelay: Math.random() * 10, platformSpeed: platformSpeed
     });
 
     level.universe.registerSystem("platformSystem", ({createView}, time) => {
@@ -99,9 +91,9 @@ export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, t
                 continue;
             }
 
-            const alpha = Math.sin(time * platformOscVelocity + platform.movementDelay);
+            const alpha = Math.sin(time * platformOscVelocity * platform.platformSpeed + platform.movementDelay);
             physicsObject.position.x = platform.originalX + (platformOscDistance * alpha);
-            physicsObject.body.needUpdate = true;
+            if (physicsObject.body) physicsObject.body.needUpdate = true;
         }
     });
 }

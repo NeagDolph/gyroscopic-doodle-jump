@@ -1,6 +1,5 @@
 <script>
 	import Panel from "./panel.svelte";
-	import DebugData from "./components/debug_data.svelte";
 
 </script>
 
@@ -10,7 +9,6 @@
 </svelte:head>
 
 <div>
-    <DebugData enabled={true}/>
     <Panel/>
 </div>
 

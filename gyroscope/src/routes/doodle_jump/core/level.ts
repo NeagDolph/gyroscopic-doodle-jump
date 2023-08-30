@@ -19,7 +19,8 @@ export type Assets = {
     playerModel: Mesh,
     boostTexture: Texture,
     platformTexture: Texture,
-    backgroundTexture: Texture
+    backgroundTexture: Texture,
+    breakableTexture: Texture
 }
 
 class GameLevel extends Scene3D {
@@ -32,15 +33,14 @@ class GameLevel extends Scene3D {
 
     private lastPausedState: boolean;
     private gamePaused: boolean;
-    private playerMotion: Vector3;
-    private pausedTime: number;
 
     private textureLoader: TextureLoader;
 
-    private backgroundTexture: Texture;
-    private boostTexture: Texture;
-    private platformTexture: Texture;
-    private playerModel: Mesh;
+    private backgroundTexture: Texture | undefined;
+    private boostTexture: Texture | undefined;
+    private breakableTexture: Texture | undefined;
+    private platformTexture: Texture | undefined;
+    private playerModel: Mesh | undefined;
     private stopped: boolean = false;
     public assets: Assets;
 
@@ -74,6 +74,7 @@ class GameLevel extends Scene3D {
     async preload() {
         this.backgroundTexture = await this.textureLoader.loadAsync("/textures/background.jpg");
         this.boostTexture = await this.textureLoader.loadAsync("/textures/boost.jpg");
+        this.breakableTexture = await this.textureLoader.loadAsync("/textures/breakable.jpg");
         this.platformTexture = await this.textureLoader.loadAsync("/textures/platform.jpg");
         this.playerModel = await loadModel('/models/doodle_jump.glb');
 
@@ -81,7 +82,8 @@ class GameLevel extends Scene3D {
             boostTexture: this.boostTexture,
             platformTexture: this.platformTexture,
             backgroundTexture: this.backgroundTexture,
-            playerModel: this.playerModel
+            playerModel: this.playerModel,
+            breakableTexture: this.breakableTexture
         }
 
 
@@ -171,8 +173,10 @@ class GameLevel extends Scene3D {
                 this.universe.destroyEntity(obj);
                 console.log("deleted entity:", obj);
             } else {
-                this.destroy(obj);
-                console.log("deleted object:", obj.name);
+                if (obj.body) {
+                    this.destroy(obj);
+                    console.log("deleted object:", obj.name);
+                }
             }
         }
         this.deletionQueue = [];

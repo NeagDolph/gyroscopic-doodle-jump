@@ -1,18 +1,19 @@
 <script>
 	import {initiateConnection, connectSession, generateSessionId} from "./connection.ts"
-	import {initGyroscope, setControlsPaused} from "./gyroscope.ts";
+	import {initGyroscope} from "./gyroscope.ts";
 	import {initWebgl, setRotation} from "./model.ts";
 	import {onMount, tick} from 'svelte';
 	import {initDoodleJump} from "./doodle_jump/main";
 	import {setBetaRotation} from "./movementStore";
 	import Stats from "./components/gyroscope_stats.svelte";
 	import LoadingIcon from "./components/loading_icon.svelte";
-    import CodePrompt from "./components/code_prompt.svelte";
-	import {gamePaused, game} from "./store/gameStore";
-	import rotatePhone from "../../static/icons/rotate_phone.svg";
+	import CodePrompt from "./components/code_prompt.svelte";
+	import {controlsPaused, gamePaused, game, score} from "./store/gameStore";
 	import {phoneOrientation} from "./store/gyroscopeStore";
 	import {toast} from '@zerodevx/svelte-toast';
-	import code_prompt from "./components/code_prompt.svelte";
+	import PauseChip from "./components/pause_chip.svelte";
+	import Score from "./components/score.svelte";
+	import GameEnd from "./components/game_end.svelte";
 
 	const connectionTypes = {
 		0: "Idle",
@@ -35,11 +36,11 @@
 	let controlsInitiated = false;
 	let connectionStatus = 0;
 
-	let controlsPaused = false;
-
 	let peerConnection;
 	let sessionId;
 	let dataChannel;
+
+	let gameEnded = false;
 
 	let codePromptEnabled = false;
 
@@ -60,6 +61,10 @@
 			if (response === 'granted') {
 				console.log("accelerometer permission granted");
 				// Do stuff here
+			}
+
+			if (response === 'denied') {
+				alert("You have denied gyroscope permission")
 			}
 		});
 	}
@@ -103,10 +108,9 @@
 			}
 		})
 
-		if (!doodleJumpInitiated && connectionType === ConnectionType.Initiator) {
+		if (connectionType === ConnectionType.Initiator) {
 			initDoodleJump();
 			gamePaused.set(false);
-			doodleJumpInitiated = true;
 		}
 
 		initGyroscope(sendChannel);
@@ -120,17 +124,14 @@
 			return;
 		}
 
-		if (gyroData.paused) {
+		controlsPaused.set(gyroData.paused)
+
+		if ($controlsPaused) {
 			setBetaRotation(0, 0, undefined);
 			return;
 		}
 
-		const validOrientation = gyroData.orientation !== 0 && gyroData.orientation !== undefined;
-
-		if (validOrientation || controlsInitiated) {
-			controlsInitiated = true;
-			setBetaRotation(gyroData.beta, gyroData.gamma, gyroData.orientation);
-		}
+		setBetaRotation(gyroData.beta, gyroData.gamma, gyroData.orientation);
 	}
 
 
@@ -140,12 +141,11 @@
 
 
 	function toggleControlsPause() {
-		if (!controlsPaused) {
+		if (!$controlsPaused) {
 			dataChannel.send(JSON.stringify({alpha: 0, beta: 0, gamma: 0, orientation: undefined}));
 		}
 
-		controlsPaused = !controlsPaused;
-		setControlsPaused(controlsPaused);
+		controlsPaused.set(!$controlsPaused);
 	}
 
 	function toggleGamePause() {
@@ -158,7 +158,7 @@
 	function onKeyDown(e) {
 		switch (e.keyCode) {
 			case 27: // ESC button
-                e.preventDefault();
+				e.preventDefault();
 				toggleGamePause();
 				break;
 		}
@@ -168,10 +168,10 @@
 		connectionType = ConnectionType.Unknown;
 		connectionState = ConnectionState.Idle;
 		controlsInitiated = false;
+		gameEnded = false;
 		phoneOrientation.set(undefined);
-		doodleJumpInitiated = false;
 		connectionStatus = 0;
-		controlsPaused = false;
+		controlsPaused.set(false);
 	}
 
 	function disconnect() {
@@ -179,8 +179,10 @@
 			return;
 		}
 
+		if (dataChannel.readyState === "open") dataChannel.send("{\"disconnected\": true}")
+
 		preDisconnect();
-		// dataChannel.send("{\"disconnected\": true}");
+
 		dataChannel.close();
 		peerConnection.close();
 		$game.stop();
@@ -204,6 +206,12 @@
 			connectionStatus = event.detail.message;
 		});
 
+		document.addEventListener("game_end", function (event) {
+			$game.stop();
+
+			gameEnded = true;
+		});
+
 		document.addEventListener("noOffers", function (event) {
 			preDisconnect();
 			toast.push('Invalid Session: ' + event.detail.message, {
@@ -221,43 +229,54 @@
 		promptComponent.unfocusInput()
 
 		connect(e.detail);
-    }
+	}
 
 	async function openCodePrompt() {
 		codePromptEnabled = true;
 		promptComponent.focusInput();
-    }
+	}
 
 	function closeCodePrompt() {
 		codePromptEnabled = false;
-    }
+	}
 
 
 	$: invalidOrienatation = ($phoneOrientation === undefined || $phoneOrientation === 180 || $phoneOrientation === 0)
 
 	// Initiate Controls if orientation is unpaused for connector
-    $: {
+	$: {
 		if (!invalidOrienatation) {
 			controlsInitiated = true;
-        }
-    }
+		}
+	}
 
 	$: {
-		if (invalidOrienatation && controlsPaused) {
+		if (invalidOrienatation && $controlsPaused) {
 			controlsInitiated = false;
-        }
+		}
+	}
+
+	function restartGame() {
+		gameEnded = false;
+		score.set(0)
+
+		document.body.querySelector("canvas").remove();
+
+		initDoodleJump();
     }
 
 </script>
 
 <svelte:window on:keydown={onKeyDown}/>
 
+
+<PauseChip enabled={connectionType === ConnectionType.Initiator} connected={connected}/>
+<Score enabled={connectionType === ConnectionType.Initiator}/>
+<GameEnd enabled={gameEnded} on:restart={restartGame}/>
 <div class="container" class:hidden={!$gamePaused && connectedInitiator}>
     <div class="panel-container">
         {#if !connectedConnector}
             <p class="title">Gyroscrope controlled Doodle Jump Demo</p>
-
-            <p class="subtitle">Connect or initiate a session</p>
 
             {#if connectionStatus >= 1}
                 <div class="row-container">
@@ -266,6 +285,8 @@
                     {/if}
                     <p class="connection_status">{connectionTypes[connectionStatus]}</p>
                 </div>
+            {:else}
+                <p class="subtitle">Connect or initiate a session</p>
             {/if}
 
             <div class="row-container">
@@ -282,7 +303,7 @@
             <div class="row-container">
                 {#if connectionType === ConnectionType.Connector && connectionState === ConnectionState.Connected}
                     <button on:click={toggleControlsPause}
-                            class="controls button-color-black">{controlsPaused ? "Resume Controls" : "Pause Controls"}</button>
+                            class="controls button-color-black">{$controlsPaused ? "Resume Controls" : "Pause Controls"}</button>
                 {/if}
             </div>
 
@@ -304,7 +325,7 @@
                 <div class="row-container">
                     {#if connectionType === ConnectionType.Connector && connectionState === ConnectionState.Connected}
                         <button on:click={toggleControlsPause}
-                                class="controls button-color-black">{controlsPaused ? "Resume Controls" : "Pause Controls"}</button>
+                                class="controls button-color-black">{$controlsPaused ? "Resume Controls" : "Pause Controls"}</button>
                     {/if}
                 </div>
             {/if}
@@ -318,7 +339,8 @@
 
     </div>
 </div>
-<CodePrompt bind:this={promptComponent} enabled={codePromptEnabled} on:entered_code={enteredCode} on:close={closeCodePrompt}/>
+<CodePrompt bind:this={promptComponent} enabled={codePromptEnabled} on:entered_code={enteredCode}
+            on:close={closeCodePrompt}/>
 
 <style>
     .session_id {

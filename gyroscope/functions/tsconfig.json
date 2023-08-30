@@ -6,11 +6,13 @@
     "outDir": "lib",
     "sourceMap": true,
     "strict": true,
-    "target": "es2017"
+    "target": "es2017",
+    "typeRoots": [ "node_modules/@types" ]
   },
   "compileOnSave": true,
   "include": [
     "src",
     "node_modules/@google-cloud/firestore/types/firestore.d.ts"
-  ]
+  ],
+  "typeRoots": [ "node_modules/@types" ]
 }

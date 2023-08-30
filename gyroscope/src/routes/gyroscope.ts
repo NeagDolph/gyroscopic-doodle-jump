@@ -1,20 +1,25 @@
 import {phoneOrientation} from "./store/gyroscopeStore";
+import {controlsPaused} from "./store/gameStore";
 
 export type StandardOrientation = undefined | -90 | 0 | 180;
 
 let reset = false;
-let paused = false;
+let controlsPausedLocal: boolean;
 let orientation: StandardOrientation = undefined;
-
-export function setControlsPaused(value: boolean) {
-    paused = value;
-}
 
 export async function initGyroscope(dataChannel: RTCDataChannel) {
     initOrientationDetection();
     await streamGyroscopeData(dataChannel);
 
-    phoneOrientation.subscribe(v => orientation = v);
+    phoneOrientation.subscribe(v => {
+        orientation = v;
+
+        const validOrientation = v !== 0 && v !== undefined;
+
+        if (validOrientation && controlsPausedLocal) controlsPaused.set(false);
+        if (!validOrientation && !controlsPausedLocal) controlsPaused.set(true);
+    });
+    controlsPaused.subscribe(v => controlsPausedLocal = v);
 }
 
 function initOrientationDetection() {
@@ -75,7 +80,7 @@ async function streamGyroscopeData(dataChannel: RTCDataChannel) {
                 beta: event.beta,
                 gamma: event.gamma,
                 orientation: orientation,
-                paused: paused,
+                paused: controlsPausedLocal,
             }
 
             dataChannel.send(JSON.stringify(data));
