@@ -325,7 +325,7 @@
                 <div class="row-container">
                     {#if connectionType === ConnectionType.Connector && connectionState === ConnectionState.Connected}
                         <button on:click={toggleControlsPause}
-                                class="controls button-color-black">{$controlsPaused ? "Resume Controls" : "Pause Controls"}</button>
+                                class="controls button-color-black disable-dbl-tap-zoom">{$controlsPaused ? "Resume Controls" : "Pause Controls"}</button>
                     {/if}
                 </div>
             {/if}

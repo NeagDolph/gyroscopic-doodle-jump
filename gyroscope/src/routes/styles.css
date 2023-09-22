@@ -46,6 +46,10 @@ a {
 	text-decoration: none;
 }
 
+.disable-dbl-tap-zoom {
+	touch-action: manipulation;
+}
+
 a:hover {
 	text-decoration: underline;
 }

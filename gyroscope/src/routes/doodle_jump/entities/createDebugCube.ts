@@ -1,6 +1,6 @@
-import {GameLevel} from "../core/level";
-import {Vec3} from "../core/vec3";
-import {THREE} from "enable3d";
+import type {GameLevel} from "../core/level";
+import type {Vec3} from "../core/vec3";
+import type {THREE} from "enable3d";
 
 let count = 0;
 

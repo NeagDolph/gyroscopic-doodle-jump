@@ -1,7 +1,7 @@
 import {ExtendedMesh, ExtendedObject3D, Scene3D, THREE} from "enable3d";
-import {createUniverse, Universe} from "necst";
-import {DebugDisplay} from "../ui/DebugDisplay";
-import type {ComponentMap, SystemList} from "../$types";
+import {createUniverse} from "necst";
+import type {Universe} from "necst";
+import type {ComponentMap, SystemList, Assets} from "../$types";
 import {Vec3} from "./vec3";
 import {createPlayer} from "../entities/createPlayer";
 import {createInputBroadcasterSystem} from "../systems/createInputBroadcasterSystem";
@@ -10,25 +10,28 @@ import {createPlatformGenerator} from "../entities/createPlatformGenerator";
 import {getGameConfig} from "./config";
 import {createShadowUpdaterSystem} from "../systems/createShadowUpdaterSystem";
 import {createPersistenceSystem} from "../systems/createPersistenceSystem";
-import {Color, Mesh, MeshBasicMaterial, PlaneGeometry, Texture, TextureLoader, Vector3} from "three";
-import {game, gamePaused} from "../../store/gameStore";
-import {loadModel} from "./loader";
-import { toast } from '@zerodevx/svelte-toast'
-
-export type Assets = {
-    playerModel: Mesh,
-    boostTexture: Texture,
-    platformTexture: Texture,
-    backgroundTexture: Texture,
-    breakableTexture: Texture
-}
+import {
+    Color,
+    LoadingManager,
+    Mesh,
+    MeshBasicMaterial,
+    PlaneGeometry,
+    Scene,
+    Texture,
+    TextureLoader,
+    Vector3
+} from "three";
+import {game, gamePaused, getLoadingBarID} from "../../store/gameStore";
+import {toast} from '@zerodevx/svelte-toast'
+import {GLTFLoader} from "three/examples/jsm/loaders/GLTFLoader";
+import {DRACOLoader} from "three/examples/jsm/loaders/DRACOLoader";
 
 class GameLevel extends Scene3D {
     public universe: Universe<ComponentMap, SystemList>;
     public directionalLight: THREE.DirectionalLight | undefined;
     public ambientLight: THREE.AmbientLight | undefined;
     public hemisphereLight: THREE.HemisphereLight | undefined;
-    public wall: Mesh;
+    public wall: Mesh | undefined;
     private deletionQueue: (string | ExtendedObject3D)[] = [];
 
     private lastPausedState: boolean;
@@ -42,6 +45,10 @@ class GameLevel extends Scene3D {
     private platformTexture: Texture | undefined;
     private playerModel: Mesh | undefined;
     private stopped: boolean = false;
+    private readonly loadingManager: LoadingManager;
+    private readonly gltfLoader: GLTFLoader;
+
+    // @ts-ignore
     public assets: Assets;
 
 
@@ -58,11 +65,23 @@ class GameLevel extends Scene3D {
             }
 
             if (!this.gamePaused && this.stopped) {
-                this.renderer.setAnimationLoop(() => {this._update()});
+                this.renderer.setAnimationLoop(() => { // @ts-ignore
+                    this._update()
+                });
             }
         });
 
-        this.textureLoader = new THREE.TextureLoader();
+        this.loadingManager = new THREE.LoadingManager();
+        this.loadingManager.onProgress = function (item, loaded, total) {
+            toast.set(getLoadingBarID(), {next: (loaded / total)})
+        };
+
+        this.textureLoader = new THREE.TextureLoader(this.loadingManager);
+        this.gltfLoader = new GLTFLoader(this.loadingManager);
+
+        const dracoLoader = new DRACOLoader();
+        dracoLoader.setDecoderPath( '/draco/' );
+        this.gltfLoader.setDRACOLoader( dracoLoader );
 
         this.lastPausedState = false;
         this.gamePaused = false;
@@ -70,25 +89,44 @@ class GameLevel extends Scene3D {
         game.set(this);
     }
 
+    private loadModel(path: string): Promise<Mesh> {
+        return new Promise((res, rej) => {
+            this.gltfLoader.load(path, function (gltf: any) {
+                res(gltf.scene)
+            }, undefined, function (error: ErrorEvent) {
+                console.error(error);
+                rej()
+            });
+        })
+    }
 
     async preload() {
-        this.backgroundTexture = await this.textureLoader.loadAsync("/textures/background.jpg");
-        this.boostTexture = await this.textureLoader.loadAsync("/textures/boost.jpg");
-        this.breakableTexture = await this.textureLoader.loadAsync("/textures/breakable.jpg");
-        this.platformTexture = await this.textureLoader.loadAsync("/textures/platform.jpg");
-        this.playerModel = await loadModel('/models/doodle_jump.glb');
+        // Create an array of promises
+        const promises = [
+            this.textureLoader.loadAsync("/textures/background.jpg"),
+            this.textureLoader.loadAsync("/textures/boost.jpg"),
+            this.textureLoader.loadAsync("/textures/breakable.jpg"),
+            this.textureLoader.loadAsync("/textures/platform.jpg"),
+            this.loadModel('/models/doodle_jump_compressed.glb')
+        ];
 
+        // Await all promises to resolve
+        const [backgroundTexture, boostTexture, breakableTexture, platformTexture, playerModel] = await Promise.all(promises);
+
+        // Store assets
         this.assets = {
-            boostTexture: this.boostTexture,
-            platformTexture: this.platformTexture,
-            backgroundTexture: this.backgroundTexture,
-            playerModel: this.playerModel,
-            breakableTexture: this.breakableTexture
+            backgroundTexture,
+            boostTexture,
+            breakableTexture,
+            platformTexture,
+            playerModel
+        };
+
+        // Update scene
+        if (this.assets.backgroundTexture instanceof Texture) {
+            this.scene.background = this.assets.backgroundTexture;
+            this.setBackground(this.scene, 7000, 3346);
         }
-
-
-        this.scene.background = this.assets.backgroundTexture;
-        this.setBackground(this.scene, 7000, 3346);
     }
 
     public async init() {
@@ -101,7 +139,7 @@ class GameLevel extends Scene3D {
             ["max_anisotropy"]: this.renderer.capabilities.getMaxAnisotropy(),
             ["is_webgl_2"]: this.renderer.capabilities.isWebGL2
         });
-        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.setPixelRatio(1);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         window.addEventListener("resize", () => {
             if (this.camera instanceof THREE.PerspectiveCamera) {
@@ -117,12 +155,10 @@ class GameLevel extends Scene3D {
         // set up scene (light, ground, grid, sky)
         const {
             ground, lights
-        } = await this.warpSpeed("-orbitControls", "-camera", "-lookAtCenter", "-fog", "-sky", "-lights");
+        } = await this.warpSpeed("-orbitControls", "-camera", "-lookAtCenter", "-fog", "-sky", "-light");
         ground!.userData[platformTag] = true;
-        // this.directionalLight = lights?.directionalLight;
-        // this.hemisphereLight = lights?.hemisphereLight;
 
-        this.ambientLight = new THREE.AmbientLight(new Color(0xffffff), 1);
+        this.ambientLight = new THREE.AmbientLight(new Color(0xffffff), 1.6);
 
         this.scene.add(this.ambientLight);
 
@@ -164,8 +200,6 @@ class GameLevel extends Scene3D {
     }
 
     public update(_time: number, delta: number) {
-        DebugDisplay.update("fps", Math.floor(1000 / delta));
-
         this.universe.update();
 
         for (const obj of this.deletionQueue) {
@@ -180,25 +214,18 @@ class GameLevel extends Scene3D {
             }
         }
         this.deletionQueue = [];
-
-
-        // const platformTag = getGameConfig("OBJECT.TAG.PLATFORM", false);
-        // const platformCount = this.scene.children.filter(obj => {
-        //     return !!obj.userData[platformTag];
-        // }).length;
-        // DebugDisplay.update("platform_count", platformCount);
-        // const collectableCount = this.physics.rigidBodies.filter(body => {
-        //     return body.name.startsWith("CollectableSensor_");
-        // }).length;
-        // DebugDisplay.update("collectable_count", collectableCount);
     }
 
     public deleteEntity(uuid: string, ...attachedObjects: ExtendedObject3D[]) {
+        console.log("Scene polycount:", this.renderer.info.render.triangles)
+        console.log("Active Drawcalls:", this.renderer.info.render.calls)
+        console.log("Textures in Memory", this.renderer.info.memory.textures)
+        console.log("Geometries in Memory", this.renderer.info.memory.geometries)
         this.deletionQueue.push(uuid, ...attachedObjects);
     }
 
-    private setBackground(scene, backgroundImageWidth, backgroundImageHeight) {
-        var windowSize = function (withScrollBar) {
+    private setBackground(scene: Scene, backgroundImageWidth: number, backgroundImageHeight: number) {
+        var windowSize = function (withScrollBar: boolean) {
             var wid = 0;
             var hei = 0;
             if (typeof window.innerWidth != "undefined") {
@@ -221,11 +248,13 @@ class GameLevel extends Scene3D {
             var size = windowSize(true);
             var factor = ((backgroundImageWidth / 2) / (backgroundImageHeight / 2)) / (size.width / size.height);
 
-            scene.background.offset.x = factor > 1 ? (1 - 1 / factor) / 2 : 0;
-            scene.background.offset.y = factor > 1 ? 0 : (1 - factor) / 2;
+            if (!(scene.background instanceof Color)) {
+                scene.background.offset.x = factor > 1 ? (1 - 1 / factor) / 2 : 0;
+                scene.background.offset.y = factor > 1 ? 0 : (1 - factor) / 2;
 
-            scene.background.repeat.x = factor > 1 ? 1 / factor : 1;
-            scene.background.repeat.y = factor > 1 ? 1 : factor;
+                scene.background.repeat.x = factor > 1 ? 1 / factor : 1;
+                scene.background.repeat.y = factor > 1 ? 1 : factor;
+            }
         }
     }
 
@@ -233,7 +262,7 @@ class GameLevel extends Scene3D {
         const at = new Vec3(6, 0, 0);
 
         const geometry = new THREE.BoxGeometry(1, 50, 50);
-        const material = new THREE.MeshBasicMaterial({ color: 0xFF0000 }); // Make it invisible
+        const material = new THREE.MeshBasicMaterial({color: 0xFF0000}); // Make it invisible
 
         // Create an ExtendedMesh and an ExtendedObject3D to contain it
         const mesh = new THREE.Mesh(geometry, material);

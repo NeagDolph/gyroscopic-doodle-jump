@@ -3,21 +3,32 @@ import {Vec3} from "../core/vec3";
 import {ExtendedMesh, ExtendedObject3D, THREE} from "enable3d";
 import {createInputReceiver} from "../core/input";
 import {lerp} from "../utils";
-import {DebugDisplay} from "../ui/DebugDisplay";
 import type {EntitySystem} from "necst";
 import type {ComponentMap, SystemList} from "../$types";
 import {getGameConfig} from "../core/config";
-import type {Material, Mesh} from "three";
-import {getBetaRotation} from "../../movementStore";
+import {Mesh} from "three";
 import {gamePaused, score} from "../../store/gameStore";
 import {toast} from '@zerodevx/svelte-toast';
+import {rotation} from "../../store/gyroscopeStore";
+import {Euler, Vector3} from "three";
 
 export function createPlayer(level: GameLevel, at: Vec3) {
     const playerName = getGameConfig("OBJECT.NAME.PLAYER", false);
     const jumpSensorName = getGameConfig("OBJECT.NAME.PLAYER_JUMP_SENSOR", false);
     const starsKey = getGameConfig("STORAGE.KEY.STARS", false);
 
+    // @ts-ignore
     const mesh: Mesh = level.assets.playerModel;
+
+    // const geometry = new THREE.CapsuleGeometry(.5, 1);
+    //
+    //
+    // const material = new THREE.MeshLambertMaterial({
+    //     color: 0xffff00
+    // });
+    //
+    // const mesh: Mesh = new Mesh(geometry, material);
+
     mesh.scale.set(0.45, 0.45, 0.45);
     mesh.position.set(0, -1, -0.1)
     mesh.rotateY(-0.4);
@@ -59,6 +70,7 @@ export function createPlayer(level: GameLevel, at: Vec3) {
         altitude: 0,
         isOnPlatform: false,
         isOnBoostPlatform: false,
+        isOnBreakablePlatform: false,
         starsCollected: parseInt(localStorage.getItem(starsKey) ?? "0"),
         fallen: false
     });
@@ -88,6 +100,9 @@ function createPlayerSystem(level: GameLevel): EntitySystem<ComponentMap, System
     let paused = false;
     // gamePaused.subscribe(v => paused = v);
 
+    let betaRotation: number;
+    rotation.subscribe(v => betaRotation = v);
+
     return ({createView, handleCommand}) => {
         const view = createView(
             "player", "inputReceiver", "physicsObject",
@@ -105,11 +120,14 @@ function createPlayerSystem(level: GameLevel): EntitySystem<ComponentMap, System
             if (!collisionSensor.active) {
                 // noinspection TypeScriptValidateJSTypes
                 collisionSensor.obj.body.on.collision((platform, event) => {
-
-
                     if (["start", "collision"].includes(event)) {
                         if (platform.userData[breakablePlatformTag] && physicsObject.body.velocity.y <= 0) {
-                            level.destroy(platform)
+                            player.isOnBoostPlatform = true;
+                            platform.body.setCollisionFlags(4);
+                            // platform.body.setGravity(0, -9.81, 0)
+                            // platform.body.applyForceY(-5)
+                            platform.body.needUpdate = true;
+                            // platform.body.refresh();
                         } else {
                             player.isOnPlatform = !!(
                                 platform.userData[platformTag]
@@ -132,7 +150,7 @@ function createPlayerSystem(level: GameLevel): EntitySystem<ComponentMap, System
             //     Number(inputReceiver.keyboard.includes("ArrowRight"))
             // );
 
-            const horizontalMovement = getBetaRotation() / 30;
+            const horizontalMovement = betaRotation / 30;
 
 
             const xVel = lerp(
@@ -145,15 +163,21 @@ function createPlayerSystem(level: GameLevel): EntitySystem<ComponentMap, System
             // jumping if close to ground and falling
             // if not
             // save and end game if player has fallen down too far
-            if (player.isOnPlatform && physicsObject.body.velocity.y <= 0) {
+            if (player.isOnPlatform && physicsObject.body.velocity.y <= 0 && !player.isOnBreakablePlatform) {
 
                 if (player.isOnBoostPlatform) {
+                    // physicsObject.body.setRotation(0, 0, -1);
+                    physicsObject.rotation.set(0, 0, -1)
+                    // physicsObject.body.rotation.z = 0;
+                    console.log(player, physicsObject, physicsObject.body)
 
                     physicsObject.body.setVelocityY(
                         playerJumpVelocity * platformBoostMult
                     );
 
                     physicsObject.body.setDamping(0, 0.8455)
+                    // physicsObject.setRotationFromAxisAngle(new Vector3(0, 0, 1), 0);
+                    // physicsObject.setRotationFromEuler(new Euler(0, 0, 1))
 
                     physicsObject.body.setAngularVelocityZ(
                         (playerJumpVelocity / 2) * platformBoostMult
@@ -164,7 +188,7 @@ function createPlayerSystem(level: GameLevel): EntitySystem<ComponentMap, System
                     physicsObject.body.setVelocityY(playerJumpVelocity);
                 }
 
-            } else if (physicsObject.position.y < player.altitude - maxVSpace * 1.5) {
+            } else if (physicsObject.position.y < player.altitude - maxVSpace * 1.8) {
                 const event = new CustomEvent("game_end");
                 document.dispatchEvent(event);
             }

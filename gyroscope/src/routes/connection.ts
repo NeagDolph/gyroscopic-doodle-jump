@@ -61,18 +61,17 @@ export function generateSessionId() {
 // Set up peer connection and its listeners
 function setupPeerConnection(sessionRef: any): RTCPeerConnection {
     const configuration = {
+        iceTransportPolicy: 'relay',
         iceServers: [{
-            urls: ["stun:eu-turn6.xirsys.com"]
+            urls: [ "stun:us-turn7.xirsys.com" ]
         }, {
-            username: "L7nsjZY69N-jee6tzOdYL0-OUuYEycA381zZHifWtNwHApwJ7tKvE7eWe2i5EiPjAAAAAGTqgadhYmNkaWxvdmVkYW4=",
-            credential: "ec40eff6-4462-11ee-aeb3-0242ac140004",
+            username: "9cvlv-U4JLTqNreSz2GbI2EtEmQvUksmaZJBZTG6D7ImeIaPODHApC0hnjVhPhFrAAAAAGT0A9BqZWJ1cw==",
+            credential: "cb932f02-4a0d-11ee-89c8-0242ac140004",
             urls: [
-                "turn:eu-turn6.xirsys.com:80?transport=udp",
-                "turn:eu-turn6.xirsys.com:3478?transport=udp",
-                "turn:eu-turn6.xirsys.com:80?transport=tcp",
-                "turn:eu-turn6.xirsys.com:3478?transport=tcp",
-                "turns:eu-turn6.xirsys.com:443?transport=tcp",
-                "turns:eu-turn6.xirsys.com:5349?transport=tcp"
+                "turn:us-turn7.xirsys.com:80?transport=tcp",
+                "turn:us-turn7.xirsys.com:3478?transport=tcp",
+                "turn:us-turn7.xirsys.com:443?transport=tcp",
+                "turn:us-turn7.xirsys.com:5349?transport=tcp"
             ]
         }]
     };
@@ -104,7 +103,13 @@ function setupPeerConnection(sessionRef: any): RTCPeerConnection {
     };
 
     peerConnection.onicecandidate = (event) => {
+        console.log("EVENT", event)
         if (event.candidate) {
+            if (event.candidate.protocol !== 'tcp') {
+                console.warn('UDP candidate detected. Ignoring.');
+                return;
+            }
+
             console.log("Ice candidates sent");
 
             // @ts-ignore

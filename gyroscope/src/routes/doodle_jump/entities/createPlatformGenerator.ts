@@ -1,11 +1,12 @@
-import {GameLevel} from "../core/level";
+import type {GameLevel} from "../core/level";
 import {getGameConfig} from "../core/config";
 import {isInRange, ascendingProbability, takeChance, descendingProbability} from "../utils";
-import type {PlatformTexturesType, PlatformType} from "../$types";
+import type {PlatformMaterialsType, PlatformTexturesType, PlatformType} from "../$types";
 import {Vec3} from "../core/vec3";
 import {createPlatform} from "./createPlatform";
 import {createCollectable} from "./createCollectable";
-import {TextureLoader} from "three";
+import {Texture, TextureLoader} from "three";
+import {THREE} from "enable3d";
 
 export function createPlatformGenerator(level: GameLevel) {
     const oscChance = getGameConfig("PLATFORM.GENERATION.OSCILLATING", true);
@@ -21,12 +22,6 @@ export function createPlatformGenerator(level: GameLevel) {
     const boostTexture = level.assets.boostTexture;
     const breakableTexture = level.assets.breakableTexture;
 
-    const textures: PlatformTexturesType = {
-        platformTexture: platformTexture,
-        boostTexture: boostTexture,
-        breakableTexture: breakableTexture
-    }
-
     let platformNumber: number = 0;
 
     // Boolean that determines if the last row of platforms contained a boost platform
@@ -39,6 +34,19 @@ export function createPlatformGenerator(level: GameLevel) {
         lastPlatformX: 0,
         maxAltitude: 0
     });
+
+    const materialNormal = new THREE.MeshStandardMaterial();
+    materialNormal.map = platformTexture;
+    const materialBoost = new THREE.MeshStandardMaterial();
+    materialBoost.map = boostTexture;
+    const materialBreakable = new THREE.MeshStandardMaterial();
+    materialBreakable.map = breakableTexture;
+
+    const materials: PlatformMaterialsType = {
+        breakableTexture: materialBreakable,
+        platformTexture: materialNormal,
+        boostTexture: materialBoost
+    }
 
 
     level.universe.registerSystem("platformGeneratorSystem", ({createView}) => {
@@ -84,7 +92,8 @@ export function createPlatformGenerator(level: GameLevel) {
             // decide on platform type
             const platformType: PlatformType = {
                 oscillating: takeChance(ascendingProbability(platformNumber)),
-                boost: takeChance(descendingProbability(platformNumber))
+                boost: takeChance(descendingProbability(platformNumber)),
+                breakable: false
             };
 
             const platform2Breakable = takeChance(ascendingProbability(platformNumber));
@@ -97,13 +106,14 @@ export function createPlatformGenerator(level: GameLevel) {
             // generate the platform
             const platformVector = new Vec3(platformX, platformGenerator.maxAltitude, 0);
 
-            createPlatform(level, platformVector, platformType, textures, platformNumber);
+            createPlatform(level, platformVector, platformType, materials, platformNumber);
 
             if (generatePlatform2) {
                 // decide on second platform type
                 platformType2 = {
                     oscillating: takeChance(ascendingProbability(platformNumber)),
-                    boost: takeChance(descendingProbability(platformNumber))
+                    boost: takeChance(descendingProbability(platformNumber)),
+                    breakable: false
                 };
 
 
@@ -126,14 +136,8 @@ export function createPlatformGenerator(level: GameLevel) {
 
                 const platformVector2 = new Vec3(platformX2, platformGenerator.maxAltitude, 0);
 
-                createPlatform(level, platformVector2, platformType2, textures, platformNumber);
+                createPlatform(level, platformVector2, platformType2, materials, platformNumber);
             }
-
-            // // generate a star by chance if platform is not oscillating
-            // if (takeChance(collectableChance) && !platformType.oscillating) {
-            //     platformVector.y++;
-            //     createCollectable(level, platformVector);
-            // }
 
             lastHadBoost = platformType.boost || platformType2.boost
 

@@ -1,7 +1,6 @@
-import {EntitySystem} from "necst";
+import type {EntitySystem} from "necst";
 import type {ComponentMap, SystemList} from "../$types";
 import {getGameConfig} from "../core/config";
-import {DebugDisplay} from "../ui/DebugDisplay";
 
 export function createPersistenceSystem(): EntitySystem<ComponentMap, SystemList> {
     const maxAltitudeKey = getGameConfig("STORAGE.KEY.MAX_ALTITUDE", false);
@@ -13,9 +12,6 @@ export function createPersistenceSystem(): EntitySystem<ComponentMap, SystemList
             if (player.altitude > savedMax) {
                 localStorage.setItem(maxAltitudeKey, String(player.altitude));
             }
-            localStorage.setItem(starsKey, String(player.starsCollected));
-
-            DebugDisplay.update("max_altitude", savedMax);
         }
     };
 }

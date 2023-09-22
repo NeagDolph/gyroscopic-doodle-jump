@@ -1,5 +1,5 @@
-import {GameLevel} from "../core/level";
-import {EntitySystem} from "necst";
+import type {GameLevel} from "../core/level";
+import type {EntitySystem} from "necst";
 import type {ComponentMap, SystemList} from "../$types";
 
 export function createShadowUpdaterSystem(

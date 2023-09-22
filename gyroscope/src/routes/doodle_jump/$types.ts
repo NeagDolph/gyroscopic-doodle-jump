@@ -1,5 +1,9 @@
 import type {ExtendedObject3D} from "enable3d";
 import type {Vec3} from "./core/vec3";
+import type {Material, NormalBufferAttributes} from "three";
+import type {Texture} from "three";
+import type {Mesh} from "three";
+import type {BufferGeometry} from "three";
 
 export type InputReceiver = {
     keyboard: string[];
@@ -12,6 +16,27 @@ export type InputReceiver = {
         x: number
         y: number
     };
+}
+
+export type Assets = {
+    playerModel: Mesh<BufferGeometry<NormalBufferAttributes>, Material | Material[]> | Texture,
+    boostTexture: Mesh<BufferGeometry<NormalBufferAttributes>, Material | Material[]> | Texture,
+    platformTexture: Mesh<BufferGeometry<NormalBufferAttributes>, Material | Material[]> | Texture,
+    backgroundTexture: Mesh<BufferGeometry<NormalBufferAttributes>, Material | Material[]> | Texture,
+    breakableTexture: Mesh<BufferGeometry<NormalBufferAttributes>, Material | Material[]> | Texture
+}
+
+export type PlatformMaterialsType = {
+    breakableTexture: Material
+    boostTexture: Material
+    platformTexture: Material
+}
+
+
+export type PlatformTexturesType = {
+    breakableTexture: Texture
+    boostTexture: Texture
+    platformTexture: Texture
 }
 
 export type ComponentMap = {

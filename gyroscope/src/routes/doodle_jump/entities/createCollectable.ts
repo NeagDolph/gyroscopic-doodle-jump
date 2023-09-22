@@ -1,7 +1,7 @@
-import {GameLevel} from "../core/level";
-import {Vec3} from "../core/vec3";
+import type {GameLevel} from "../core/level";
+import type {Vec3} from "../core/vec3";
 import {ExtendedObject3D, THREE} from "enable3d";
-import {EntitySystem} from "necst";
+import type {EntitySystem} from "necst";
 import type {ComponentMap, SystemList} from "../$types";
 import {getGameConfig} from "../core/config";
 

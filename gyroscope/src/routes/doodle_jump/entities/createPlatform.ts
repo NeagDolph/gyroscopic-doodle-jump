@@ -1,13 +1,15 @@
-import {GameLevel} from "../core/level";
-import {Vec3} from "../core/vec3";
-import type {PlatformTexturesType, PlatformType} from "../$types";
+import type {GameLevel} from "../core/level";
+import type {Vec3} from "../core/vec3";
+import type {PlatformMaterialsType, PlatformTexturesType, PlatformType} from "../$types";
 import {getGameConfig} from "../core/config";
-import {Mesh, Texture} from "three";
+import {Material, Mesh, Texture} from "three";
 import {ExtendedMesh, ExtendedObject3D, THREE} from "enable3d";
 import {RoundedBoxGeometry} from "three/examples/jsm/geometries/RoundedBoxGeometry";
 import {ascendingProbability} from "../utils";
 
-export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, texture: PlatformTexturesType, platformNumber: number) {
+const geometry = new RoundedBoxGeometry(1.5, .4, 0.5, 6, 0.5);
+
+export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, textures: PlatformMaterialsType, platformNumber: number) {
     const platformOscDistance = getGameConfig("PLATFORM.OSCILLATION.DISTANCE", true);
     const platformOscVelocity = getGameConfig("PLATFORM.OSCILLATION.VELOCITY", true);
     const platformTag = getGameConfig("OBJECT.TAG.PLATFORM", false);
@@ -15,12 +17,16 @@ export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, t
     const breakablePlatformTag = getGameConfig("OBJECT.TAG.BREAKABLE_PLATFORM", false);
     const maxVSpace = getGameConfig("PLATFORM.GENERATION.MAX_VERTICAL_SPACE", true);
 
-    const geometry = new RoundedBoxGeometry(1.5, .4, 0.5, 6, 0.5);
-
-    const material = new THREE.MeshPhongMaterial();
+    let material;
+    if (type.breakable) {
+        material = textures.breakableTexture;
+    } else if (type.boost) {
+        material = textures.boostTexture;
+    } else {
+        material = textures.platformTexture;
+    }
 
     const mesh = new ExtendedMesh(geometry, material);
-    // mesh.position.setY(0.4)
 
     const object3D = new ExtendedObject3D();
     object3D.add(mesh);
@@ -33,15 +39,6 @@ export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, t
         type.breakable = false;
     }
 
-
-    if (type.breakable) {
-        material.map = texture.breakableTexture;
-    } else if (type.boost) {
-        material.map = texture.boostTexture;
-    } else {
-        material.map = texture.platformTexture;
-    }
-
     level.physics.add.existing(object3D, {
         shape: "box",
         width: 1.5,
@@ -50,6 +47,8 @@ export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, t
         // x: at.x,
         // y: at.y,
         // z: at.z,
+        mass: 1,
+        // collisionFlags: type.breakable ? 4 : 2,
         collisionFlags: ((type.oscillating || type.breakable) && platformNumber > 0 ? 2 : 1),
         breakable: type.breakable
     })
@@ -66,7 +65,7 @@ export function createPlatform(level: GameLevel, at: Vec3, type: PlatformType, t
     const uuid = level.universe.createEntity();
     level.universe.attachComponent(uuid, "physicsObject", object3D);
 
-    const platformSpeed = Math.random() + ascendingProbability(platformNumber);
+    const platformSpeed = 0.5 + ascendingProbability(platformNumber);
 
     level.universe.attachComponent(uuid, "platform", {
         ...type, originalX: at.x, movementDelay: Math.random() * 10, platformSpeed: platformSpeed

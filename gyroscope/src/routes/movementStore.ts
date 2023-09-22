@@ -1,4 +1,4 @@
-let betaRotation: number = 0;
+import {rotation} from "./store/gyroscopeStore";
 
 type Orientation = 90 | -90 | undefined | 0;
 
@@ -13,9 +13,5 @@ export function setBetaRotation(rot: number, gamma: number, orientation: Orienta
     }
 
     // In case phone is rotated to other side
-    betaRotation = orientation === -90 ? -tempRotation : tempRotation;
-}
-
-export function getBetaRotation(): number {
-    return betaRotation;
+    rotation.set(orientation === -90 ? -tempRotation : tempRotation);
 }
